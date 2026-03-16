@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model Visitor {
@@ -93,4 +94,12 @@ model MetaLog {
   timestamp        DateTime @default(now())
 
   @@map("meta_logs")
+}
+
+model AppConfig {
+  id               String  @id @default(auto()) @map("_id") @db.ObjectId
+  key              String  @unique
+  trackingEnabled  Boolean @default(true) @map("tracking_enabled")
+
+  @@map("app_config")
 }
