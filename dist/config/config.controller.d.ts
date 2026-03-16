@@ -5,7 +5,9 @@ export declare class ConfigController {
     getTrackingStatus(): Promise<{
         tracking_enabled: boolean;
     }>;
-    toggleTracking(): Promise<{
+    toggleTracking(body: {
+        tracking_enabled?: boolean;
+    }): Promise<{
         tracking_enabled: boolean;
     }>;
 }

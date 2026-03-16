@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TokenGuard } from '../auth/token.guard';
 import { ConfigService } from './config.service';
@@ -19,13 +19,13 @@ export class ConfigController {
   }
 
   /**
-   * Toggle tracking on/off — requires auth.
+   * Set tracking on/off — requires auth.
    */
   @Patch('toggle-tracking')
   @UseGuards(TokenGuard)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Toggle tracking on/off (requires auth)' })
-  async toggleTracking() {
-    return this.configService.toggleTracking();
+  @ApiOperation({ summary: 'Set tracking on/off (requires auth)' })
+  async toggleTracking(@Body() body: { tracking_enabled?: boolean }) {
+    return this.configService.setTracking(body.tracking_enabled);
   }
 }

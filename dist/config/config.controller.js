@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConfigController = void 0;
 const common_1 = require("@nestjs/common");
@@ -22,8 +25,8 @@ let ConfigController = class ConfigController {
     async getTrackingStatus() {
         return this.configService.getTrackingStatus();
     }
-    async toggleTracking() {
-        return this.configService.toggleTracking();
+    async toggleTracking(body) {
+        return this.configService.setTracking(body.tracking_enabled);
     }
 };
 exports.ConfigController = ConfigController;
@@ -38,9 +41,10 @@ __decorate([
     (0, common_1.Patch)('toggle-tracking'),
     (0, common_1.UseGuards)(token_guard_1.TokenGuard),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, swagger_1.ApiOperation)({ summary: 'Toggle tracking on/off (requires auth)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Set tracking on/off (requires auth)' }),
+    __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], ConfigController.prototype, "toggleTracking", null);
 exports.ConfigController = ConfigController = __decorate([

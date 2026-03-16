@@ -34,13 +34,22 @@ export class ConfigService {
     return { tracking_enabled: config.trackingEnabled };
   }
 
-  async toggleTracking() {
+  async setTracking(enabled?: boolean) {
     const config = await this.getOrCreateConfig();
-    const updated = await this.prisma.appConfig.update({
-      where: { key: CONFIG_KEY },
-      data: { trackingEnabled: !config.trackingEnabled },
-    });
+    const newValue = enabled !== undefined ? enabled : !config.trackingEnabled;
 
-    return { tracking_enabled: updated.trackingEnabled };
+    try {
+      const updated = await this.prisma.appConfig.update({
+        where: { key: CONFIG_KEY },
+        data: { trackingEnabled: newValue },
+      });
+      return { tracking_enabled: updated.trackingEnabled };
+    } catch {
+      // If update fails (e.g. record doesn't exist yet), try create
+      const created = await this.prisma.appConfig.create({
+        data: { key: CONFIG_KEY, trackingEnabled: newValue },
+      });
+      return { tracking_enabled: created.trackingEnabled };
+    }
   }
 }

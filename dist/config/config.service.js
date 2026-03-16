@@ -38,13 +38,22 @@ let ConfigService = class ConfigService {
         const config = await this.getOrCreateConfig();
         return { tracking_enabled: config.trackingEnabled };
     }
-    async toggleTracking() {
+    async setTracking(enabled) {
         const config = await this.getOrCreateConfig();
-        const updated = await this.prisma.appConfig.update({
-            where: { key: CONFIG_KEY },
-            data: { trackingEnabled: !config.trackingEnabled },
-        });
-        return { tracking_enabled: updated.trackingEnabled };
+        const newValue = enabled !== undefined ? enabled : !config.trackingEnabled;
+        try {
+            const updated = await this.prisma.appConfig.update({
+                where: { key: CONFIG_KEY },
+                data: { trackingEnabled: newValue },
+            });
+            return { tracking_enabled: updated.trackingEnabled };
+        }
+        catch {
+            const created = await this.prisma.appConfig.create({
+                data: { key: CONFIG_KEY, trackingEnabled: newValue },
+            });
+            return { tracking_enabled: created.trackingEnabled };
+        }
     }
 };
 exports.ConfigService = ConfigService;

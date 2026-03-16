@@ -6,7 +6,7 @@ export declare class ConfigService {
     getTrackingStatus(): Promise<{
         tracking_enabled: boolean;
     }>;
-    toggleTracking(): Promise<{
+    setTracking(enabled?: boolean): Promise<{
         tracking_enabled: boolean;
     }>;
 }
