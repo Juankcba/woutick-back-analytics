@@ -2,9 +2,10 @@ import { IsString, IsOptional, IsBoolean, IsObject, IsNumber } from 'class-valid
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class TrackEventDto {
-  @ApiProperty({ description: 'IP del visitante', example: '185.140.33.38' })
+  @ApiPropertyOptional({ description: 'IP del visitante (auto-detectada si no se envía)', example: '185.140.33.38' })
   @IsString()
-  ip!: string;
+  @IsOptional()
+  ip?: string;
 
   @ApiPropertyOptional({ description: 'User-Agent del navegador' })
   @IsString()
@@ -92,9 +93,10 @@ export class TrackEventDto {
 }
 
 export class TrackRequestLogDto {
-  @ApiProperty({ description: 'IP del visitante', example: '185.140.33.38' })
+  @ApiPropertyOptional({ description: 'IP del visitante (auto-detectada si no se envía)', example: '185.140.33.38' })
   @IsString()
-  ip!: string;
+  @IsOptional()
+  ip?: string;
 
   @ApiPropertyOptional({ description: 'ID de sesión existente' })
   @IsString()
@@ -210,9 +212,10 @@ export class TrackMetaLogDto {
 }
 
 export class HeartbeatDto {
-  @ApiProperty({ description: 'IP del visitante', example: '185.140.33.38' })
+  @ApiPropertyOptional({ description: 'IP del visitante (auto-detectada si no se envía)', example: '185.140.33.38' })
   @IsString()
-  ip!: string;
+  @IsOptional()
+  ip?: string;
 
   @ApiPropertyOptional({ description: 'User-Agent del navegador' })
   @IsString()

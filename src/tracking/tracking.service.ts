@@ -99,9 +99,9 @@ export class TrackingService {
    * Process a heartbeat: mark user online, create/update visitor+session.
    */
   async heartbeat(dto: HeartbeatDto) {
-    await this.redis.markOnline(dto.ip);
+    await this.redis.markOnline(dto.ip!);
 
-    const { visitor, session } = await this.getOrCreateVisitorAndSession(dto.ip, {
+    const { visitor, session } = await this.getOrCreateVisitorAndSession(dto.ip!, {
       userAgent: dto.user_agent,
       hasAdblock: dto.has_adblock,
       fbp: dto.fbp,
@@ -116,9 +116,9 @@ export class TrackingService {
    * Track a user event (PageView, AddToCart, Purchase, etc.)
    */
   async trackEvent(dto: TrackEventDto) {
-    await this.redis.markOnline(dto.ip);
+    await this.redis.markOnline(dto.ip!);
 
-    const { session } = await this.getOrCreateVisitorAndSession(dto.ip, {
+    const { session } = await this.getOrCreateVisitorAndSession(dto.ip!, {
       userAgent: dto.user_agent,
       hasAdblock: dto.has_adblock,
       fbp: dto.fbp,
@@ -151,7 +151,7 @@ export class TrackingService {
    * Log a request/response (e.g. order creation).
    */
   async trackRequestLog(dto: TrackRequestLogDto) {
-    const { session } = await this.getOrCreateVisitorAndSession(dto.ip);
+    const { session } = await this.getOrCreateVisitorAndSession(dto.ip!);
 
     const log = await this.prisma.requestLog.create({
       data: {

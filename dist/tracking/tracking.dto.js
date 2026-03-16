@@ -34,8 +34,9 @@ class TrackEventDto {
 }
 exports.TrackEventDto = TrackEventDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ description: 'IP del visitante', example: '185.140.33.38' }),
+    (0, swagger_1.ApiPropertyOptional)({ description: 'IP del visitante (auto-detectada si no se envía)', example: '185.140.33.38' }),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], TrackEventDto.prototype, "ip", void 0);
 __decorate([
@@ -151,8 +152,9 @@ class TrackRequestLogDto {
 }
 exports.TrackRequestLogDto = TrackRequestLogDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ description: 'IP del visitante', example: '185.140.33.38' }),
+    (0, swagger_1.ApiPropertyOptional)({ description: 'IP del visitante (auto-detectada si no se envía)', example: '185.140.33.38' }),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], TrackRequestLogDto.prototype, "ip", void 0);
 __decorate([
@@ -317,8 +319,9 @@ class HeartbeatDto {
 }
 exports.HeartbeatDto = HeartbeatDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ description: 'IP del visitante', example: '185.140.33.38' }),
+    (0, swagger_1.ApiPropertyOptional)({ description: 'IP del visitante (auto-detectada si no se envía)', example: '185.140.33.38' }),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], HeartbeatDto.prototype, "ip", void 0);
 __decorate([

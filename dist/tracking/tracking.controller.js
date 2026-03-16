@@ -18,21 +18,39 @@ const swagger_1 = require("@nestjs/swagger");
 const token_guard_1 = require("../auth/token.guard");
 const tracking_service_1 = require("./tracking.service");
 const tracking_dto_1 = require("./tracking.dto");
+function extractIp(req, bodyIp) {
+    if (bodyIp)
+        return bodyIp;
+    const xff = req.headers['x-forwarded-for'];
+    if (xff) {
+        const first = Array.isArray(xff) ? xff[0] : xff.split(',')[0];
+        return first.trim();
+    }
+    const cfIp = req.headers['cf-connecting-ip'];
+    if (cfIp)
+        return Array.isArray(cfIp) ? cfIp[0] : cfIp;
+    return req.ip || '0.0.0.0';
+}
 let TrackingController = class TrackingController {
     trackingService;
     constructor(trackingService) {
         this.trackingService = trackingService;
     }
-    async heartbeat(dto) {
+    async heartbeat(dto, req) {
+        dto.ip = extractIp(req, dto.ip);
         return this.trackingService.heartbeat(dto);
     }
-    async trackEvent(dto) {
+    async trackEvent(dto, req) {
+        dto.ip = extractIp(req, dto.ip);
         return this.trackingService.trackEvent(dto);
     }
-    async trackRequestLog(dto) {
+    async trackRequestLog(dto, req) {
+        dto.ip = extractIp(req, dto.ip);
         return this.trackingService.trackRequestLog(dto);
     }
-    async trackMetaLog(dto) {
+    async trackMetaLog(dto, req) {
+        if (!dto.ip)
+            dto.ip = extractIp(req);
         return this.trackingService.trackMetaLog(dto);
     }
 };
@@ -41,32 +59,36 @@ __decorate([
     (0, common_1.Post)('heartbeat'),
     (0, swagger_1.ApiOperation)({ summary: 'Heartbeat — mantener usuario online y crear/actualizar sesión' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [tracking_dto_1.HeartbeatDto]),
+    __metadata("design:paramtypes", [tracking_dto_1.HeartbeatDto, Object]),
     __metadata("design:returntype", Promise)
 ], TrackingController.prototype, "heartbeat", null);
 __decorate([
     (0, common_1.Post)('event'),
     (0, swagger_1.ApiOperation)({ summary: 'Registrar evento del usuario (PageView, AddToCart, Purchase, etc.)' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [tracking_dto_1.TrackEventDto]),
+    __metadata("design:paramtypes", [tracking_dto_1.TrackEventDto, Object]),
     __metadata("design:returntype", Promise)
 ], TrackingController.prototype, "trackEvent", null);
 __decorate([
     (0, common_1.Post)('request-log'),
     (0, swagger_1.ApiOperation)({ summary: 'Registrar request/response (ej: creación de orden)' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [tracking_dto_1.TrackRequestLogDto]),
+    __metadata("design:paramtypes", [tracking_dto_1.TrackRequestLogDto, Object]),
     __metadata("design:returntype", Promise)
 ], TrackingController.prototype, "trackRequestLog", null);
 __decorate([
     (0, common_1.Post)('meta-log'),
     (0, swagger_1.ApiOperation)({ summary: 'Registrar llamada a la API de conversiones de Meta' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [tracking_dto_1.TrackMetaLogDto]),
+    __metadata("design:paramtypes", [tracking_dto_1.TrackMetaLogDto, Object]),
     __metadata("design:returntype", Promise)
 ], TrackingController.prototype, "trackMetaLog", null);
 exports.TrackingController = TrackingController = __decorate([

@@ -1,5 +1,5 @@
 export declare class TrackEventDto {
-    ip: string;
+    ip?: string;
     user_agent?: string;
     session_id?: string;
     event_name: string;
@@ -19,7 +19,7 @@ export declare class TrackEventDto {
     environment?: string;
 }
 export declare class TrackRequestLogDto {
-    ip: string;
+    ip?: string;
     session_id?: string;
     method: string;
     endpoint: string;
@@ -47,7 +47,7 @@ export declare class TrackMetaLogDto {
     has_adblock?: boolean;
 }
 export declare class HeartbeatDto {
-    ip: string;
+    ip?: string;
     user_agent?: string;
     url?: string;
     has_adblock?: boolean;
