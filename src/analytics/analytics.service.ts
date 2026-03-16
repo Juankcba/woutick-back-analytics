@@ -29,11 +29,30 @@ export class AnalyticsService {
           orderBy: { lastSeen: 'desc' },
           skip,
           take: limit,
-          include: { _count: { select: { sessions: true } } },
+          include: {
+            _count: { select: { sessions: true } },
+            sessions: {
+              orderBy: { startedAt: 'desc' },
+              take: 1,
+              select: { landingUrl: true, environment: true },
+            },
+          },
         }),
         this.prisma.visitor.count(),
       ]);
-      return { visitors, total, page, limit };
+
+      // Flatten latest session data onto visitor object
+      const mapped = visitors.map((v: any) => {
+        const latest = v.sessions?.[0];
+        return {
+          ...v,
+          landingUrl: latest?.landingUrl || null,
+          environment: latest?.environment || null,
+          sessions: undefined, // Remove raw sessions array
+        };
+      });
+
+      return { visitors: mapped, total, page, limit };
     } catch {
       return { visitors: [], total: 0, page, limit };
     }
