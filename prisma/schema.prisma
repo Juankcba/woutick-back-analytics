@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+}
+
+model Visitor {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  ip         String   @unique
+  userAgent  String?  @map("user_agent")
+  country    String?
+  city       String?
+  hasAdblock Boolean  @default(false) @map("has_adblock")
+  fbp        String?
+  firstSeen  DateTime @default(now()) @map("first_seen")
+  lastSeen   DateTime @updatedAt @map("last_seen")
+  sessions   Session[]
+
+  @@map("visitors")
+}
+
+model Session {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  visitor       Visitor      @relation(fields: [visitorId], references: [id])
+  visitorId     String       @db.ObjectId @map("visitor_id")
+  startedAt     DateTime     @default(now()) @map("started_at")
+  lastActivity  DateTime     @default(now()) @map("last_activity")
+  landingUrl    String?      @map("landing_url")
+  utmSource     String?      @map("utm_source")
+  utmMedium     String?      @map("utm_medium")
+  utmCampaign   String?      @map("utm_campaign")
+  utmContent    String?      @map("utm_content")
+  fbclid        String?
+  referer       String?
+  eventSlug     String?      @map("event_slug")
+  hasAdblock    Boolean      @default(false) @map("has_adblock")
+  events        Event[]
+  requestLogs   RequestLog[]
+  metaLogs      MetaLog[]
+
+  @@map("sessions")
+}
+
+model Event {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  session    Session  @relation(fields: [sessionId], references: [id])
+  sessionId  String   @db.ObjectId @map("session_id")
+  eventName  String   @map("event_name")
+  eventId    String?  @map("event_id")
+  url        String?
+  slug       String?
+  timestamp  DateTime @default(now())
+  customData Json?    @map("custom_data")
+
+  @@map("events")
+}
+
+model RequestLog {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  session      Session  @relation(fields: [sessionId], references: [id])
+  sessionId    String   @db.ObjectId @map("session_id")
+  method       String
+  endpoint     String
+  statusCode   Int?     @map("status_code")
+  requestBody  Json?    @map("request_body")
+  responseBody Json?    @map("response_body")
+  durationMs   Int?     @map("duration_ms")
+  timestamp    DateTime @default(now())
+
+  @@map("request_logs")
+}
+
+model MetaLog {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  session          Session? @relation(fields: [sessionId], references: [id])
+  sessionId        String?  @db.ObjectId @map("session_id")
+  eventName        String   @map("event_name")
+  eventId          String?  @map("event_id")
+  pixelId          String?  @map("pixel_id")
+  route            String
+  requestPayload   Json     @map("request_payload")
+  responsePayload  Json?    @map("response_payload")
+  hasFbp           Boolean  @default(false) @map("has_fbp")
+  hasFbc           Boolean  @default(false) @map("has_fbc")
+  hasEmail         Boolean  @default(false) @map("has_email")
+  hasPhone         Boolean  @default(false) @map("has_phone")
+  hasFn            Boolean  @default(false) @map("has_fn")
+  hasLn            Boolean  @default(false) @map("has_ln")
+  clientIp         String?  @map("client_ip")
+  hasAdblock       Boolean  @default(false) @map("has_adblock")
+  timestamp        DateTime @default(now())
+
+  @@map("meta_logs")
+}
