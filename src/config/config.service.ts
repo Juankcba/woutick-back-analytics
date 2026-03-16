@@ -73,8 +73,15 @@ export class ConfigService {
         newValue = !current.tracking_enabled;
       }
 
+      console.log(`[Config] setTracking: setting to ${newValue}`);
+
       // 1. Write to Redis immediately (fast for frontend)
-      await this.redis.set(REDIS_TRACKING_KEY, newValue ? '1' : '0').catch(() => {});
+      try {
+        await this.redis.set(REDIS_TRACKING_KEY, newValue ? '1' : '0');
+        console.log(`[Config] Redis updated: ${REDIS_TRACKING_KEY} = ${newValue ? '1' : '0'}`);
+      } catch (e) {
+        console.error('[Config] Redis write failed:', e);
+      }
 
       // 2. Persist to Mongo (upsert to avoid find+update race)
       try {
@@ -92,12 +99,14 @@ export class ConfigService {
             data: { key: CONFIG_KEY, trackingEnabled: newValue },
           });
         }
-      } catch {
-        // Mongo write failed, but Redis is already updated
+        console.log(`[Config] Mongo updated: trackingEnabled = ${newValue}`);
+      } catch (e) {
+        console.error('[Config] Mongo write failed:', e);
       }
 
       return { tracking_enabled: newValue };
-    } catch {
+    } catch (e) {
+      console.error('[Config] setTracking error:', e);
       return { tracking_enabled: enabled ?? true };
     }
   }
