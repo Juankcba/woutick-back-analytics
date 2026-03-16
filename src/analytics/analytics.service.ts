@@ -156,25 +156,58 @@ export class AnalyticsService {
     }
   }
 
-  /** General dashboard stats */
+  /** General dashboard stats — single parallel batch */
   async getDashboardStats() {
-    const onlineData = await this.getOnlineCount();
-
-    let totals = { visitors: 0, sessions: 0, events: 0, meta_logs: 0 };
     try {
-      const [totalVisitors, totalSessions, totalEvents, totalMetaLogs] =
-        await Promise.all([
-          this.prisma.visitor.count(),
-          this.prisma.session.count(),
-          this.prisma.event.count(),
-          this.prisma.metaLog.count(),
-        ]);
-      totals = { visitors: totalVisitors, sessions: totalSessions, events: totalEvents, meta_logs: totalMetaLogs };
-    } catch { /* empty collections */ }
+      const [
+        onlineData,
+        totalVisitors,
+        totalSessions,
+        totalEvents,
+        totalMetaLogs,
+        adblockVisitors,
+        adblockSessions,
+      ] = await Promise.all([
+        this.getOnlineCount(),
+        this.prisma.visitor.count(),
+        this.prisma.session.count(),
+        this.prisma.event.count(),
+        this.prisma.metaLog.count(),
+        this.prisma.visitor.count({ where: { hasAdblock: true } }),
+        this.prisma.session.count({ where: { hasAdblock: true } }),
+      ]);
 
-    const adblock = await this.getAdblockStats();
-
-    return { online: onlineData, totals, adblock };
+      return {
+        online: onlineData,
+        totals: {
+          visitors: totalVisitors,
+          sessions: totalSessions,
+          events: totalEvents,
+          meta_logs: totalMetaLogs,
+        },
+        adblock: {
+          visitors: {
+            total: totalVisitors,
+            with_adblock: adblockVisitors,
+            percentage: totalVisitors > 0 ? Math.round((adblockVisitors / totalVisitors) * 100 * 10) / 10 : 0,
+          },
+          sessions: {
+            total: totalSessions,
+            with_adblock: adblockSessions,
+            percentage: totalSessions > 0 ? Math.round((adblockSessions / totalSessions) * 100 * 10) / 10 : 0,
+          },
+        },
+      };
+    } catch {
+      return {
+        online: { online_count: 0, online_ips: [] },
+        totals: { visitors: 0, sessions: 0, events: 0, meta_logs: 0 },
+        adblock: {
+          visitors: { total: 0, with_adblock: 0, percentage: 0 },
+          sessions: { total: 0, with_adblock: 0, percentage: 0 },
+        },
+      };
+    }
   }
 
   /** Funnel de conversión */
