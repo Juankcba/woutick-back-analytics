@@ -98,6 +98,7 @@ export declare class AnalyticsService {
             pixelId: string | null;
             requestPayload: import("@prisma/client/runtime/library").JsonValue;
             responsePayload: import("@prisma/client/runtime/library").JsonValue | null;
+            responseStatus: number | null;
             hasFbp: boolean;
             hasFbc: boolean;
             hasEmail: boolean;
@@ -194,6 +195,7 @@ export declare class AnalyticsService {
                 pixelId: string | null;
                 requestPayload: import("@prisma/client/runtime/library").JsonValue;
                 responsePayload: import("@prisma/client/runtime/library").JsonValue | null;
+                responseStatus: number | null;
                 hasFbp: boolean;
                 hasFbc: boolean;
                 hasEmail: boolean;

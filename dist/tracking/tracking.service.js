@@ -141,6 +141,7 @@ let TrackingService = TrackingService_1 = class TrackingService {
                 route: dto.route,
                 requestPayload: dto.request_payload,
                 responsePayload: dto.response_payload ?? undefined,
+                responseStatus: dto.response_status ?? undefined,
                 hasFbp: dto.has_fbp ?? false,
                 hasFbc: dto.has_fbc ?? false,
                 hasEmail: dto.has_email ?? false,

@@ -37,6 +37,7 @@ export declare class TrackMetaLogDto {
     route: string;
     request_payload: Record<string, any>;
     response_payload?: Record<string, any>;
+    response_status?: number;
     has_fbp?: boolean;
     has_fbc?: boolean;
     has_email?: boolean;

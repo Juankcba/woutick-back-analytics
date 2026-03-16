@@ -84,6 +84,7 @@ model MetaLog {
   route            String
   requestPayload   Json     @map("request_payload")
   responsePayload  Json?    @map("response_payload")
+  responseStatus   Int?     @map("response_status")
   hasFbp           Boolean  @default(false) @map("has_fbp")
   hasFbc           Boolean  @default(false) @map("has_fbc")
   hasEmail         Boolean  @default(false) @map("has_email")

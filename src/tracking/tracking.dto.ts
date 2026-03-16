@@ -170,6 +170,10 @@ export class TrackMetaLogDto {
   @IsOptional()
   response_payload?: Record<string, any>;
 
+  @ApiPropertyOptional({ description: 'HTTP status de la respuesta de Meta', example: 200 })
+  @IsOptional()
+  response_status?: number;
+
   @ApiPropertyOptional({ description: '¿El payload incluye fbp?' })
   @IsBoolean()
   @IsOptional()

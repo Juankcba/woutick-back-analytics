@@ -206,6 +206,7 @@ class TrackMetaLogDto {
     route;
     request_payload;
     response_payload;
+    response_status;
     has_fbp;
     has_fbc;
     has_email;
@@ -261,6 +262,11 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Object)
 ], TrackMetaLogDto.prototype, "response_payload", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'HTTP status de la respuesta de Meta', example: 200 }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], TrackMetaLogDto.prototype, "response_status", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: '¿El payload incluye fbp?' }),
     (0, class_validator_1.IsBoolean)(),
