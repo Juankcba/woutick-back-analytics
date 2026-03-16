@@ -99,4 +99,25 @@ export class AnalyticsController {
   async getAdblockStats() {
     return this.analyticsService.getAdblockStats();
   }
+
+  @Get('funnel')
+  @ApiOperation({ summary: 'Funnel de conversión: PageView → AddToCart → InitiateCheckout → Purchase' })
+  @ApiQuery({ name: 'environment', required: false, example: 'production' })
+  async getFunnel(@Query('environment') environment?: string) {
+    return this.analyticsService.getFunnel(environment);
+  }
+
+  @Get('campaign-stats')
+  @ApiOperation({ summary: 'Campañas registradas con conteo de sesiones' })
+  @ApiQuery({ name: 'environment', required: false })
+  async getCampaignStats(@Query('environment') environment?: string) {
+    return this.analyticsService.getCampaignStats(environment);
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Buscar visitante por IP y obtener su journey completo' })
+  @ApiQuery({ name: 'ip', required: true, example: '185.140.33.38' })
+  async searchByIp(@Query('ip') ip: string) {
+    return this.analyticsService.searchByIp(ip);
+  }
 }

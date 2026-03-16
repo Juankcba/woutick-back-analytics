@@ -11,17 +11,22 @@ export class ConfigService {
    * Get or create the global config record.
    */
   private async getOrCreateConfig() {
-    let config = await this.prisma.appConfig.findUnique({
-      where: { key: CONFIG_KEY },
-    });
-
-    if (!config) {
-      config = await this.prisma.appConfig.create({
-        data: { key: CONFIG_KEY, trackingEnabled: true },
+    try {
+      let config = await this.prisma.appConfig.findUnique({
+        where: { key: CONFIG_KEY },
       });
-    }
 
-    return config;
+      if (!config) {
+        config = await this.prisma.appConfig.create({
+          data: { key: CONFIG_KEY, trackingEnabled: true },
+        });
+      }
+
+      return config;
+    } catch (error) {
+      // If the collection doesn't exist yet or any DB error, return a safe default
+      return { key: CONFIG_KEY, trackingEnabled: true };
+    }
   }
 
   async getTrackingStatus() {

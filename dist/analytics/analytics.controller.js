@@ -51,6 +51,15 @@ let AnalyticsController = class AnalyticsController {
     async getAdblockStats() {
         return this.analyticsService.getAdblockStats();
     }
+    async getFunnel(environment) {
+        return this.analyticsService.getFunnel(environment);
+    }
+    async getCampaignStats(environment) {
+        return this.analyticsService.getCampaignStats(environment);
+    }
+    async searchByIp(ip) {
+        return this.analyticsService.searchByIp(ip);
+    }
 };
 exports.AnalyticsController = AnalyticsController;
 __decorate([
@@ -132,6 +141,33 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getAdblockStats", null);
+__decorate([
+    (0, common_1.Get)('funnel'),
+    (0, swagger_1.ApiOperation)({ summary: 'Funnel de conversión: PageView → AddToCart → InitiateCheckout → Purchase' }),
+    (0, swagger_1.ApiQuery)({ name: 'environment', required: false, example: 'production' }),
+    __param(0, (0, common_1.Query)('environment')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getFunnel", null);
+__decorate([
+    (0, common_1.Get)('campaign-stats'),
+    (0, swagger_1.ApiOperation)({ summary: 'Campañas registradas con conteo de sesiones' }),
+    (0, swagger_1.ApiQuery)({ name: 'environment', required: false }),
+    __param(0, (0, common_1.Query)('environment')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getCampaignStats", null);
+__decorate([
+    (0, common_1.Get)('search'),
+    (0, swagger_1.ApiOperation)({ summary: 'Buscar visitante por IP y obtener su journey completo' }),
+    (0, swagger_1.ApiQuery)({ name: 'ip', required: true, example: '185.140.33.38' }),
+    __param(0, (0, common_1.Query)('ip')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "searchByIp", null);
 exports.AnalyticsController = AnalyticsController = __decorate([
     (0, swagger_1.ApiTags)('analytics'),
     (0, swagger_1.ApiBearerAuth)('access-token'),

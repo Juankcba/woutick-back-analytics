@@ -153,4 +153,86 @@ export class AnalyticsService {
       adblock: adblockStats,
     };
   }
+
+  /** Funnel de conversión */
+  async getFunnel(environment?: string) {
+    const envFilter = environment ? { session: { environment } } : {};
+    const sessionEnvFilter = environment ? { environment } : {};
+
+    const [pageViews, addToCarts, checkouts, purchases] = await Promise.all([
+      this.prisma.event.groupBy({
+        by: ['sessionId'],
+        where: { eventName: 'PageView', ...envFilter },
+      }),
+      this.prisma.event.groupBy({
+        by: ['sessionId'],
+        where: { eventName: 'AddToCart', ...envFilter },
+      }),
+      this.prisma.event.groupBy({
+        by: ['sessionId'],
+        where: { eventName: 'InitiateCheckout', ...envFilter },
+      }),
+      this.prisma.event.groupBy({
+        by: ['sessionId'],
+        where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] }, ...envFilter },
+      }),
+    ]);
+
+    const totalSessions = await this.prisma.session.count({ where: sessionEnvFilter });
+
+    return {
+      total_sessions: totalSessions,
+      funnel: [
+        { step: 'PageView', sessions: pageViews.length, percentage: totalSessions > 0 ? Math.round((pageViews.length / totalSessions) * 100 * 10) / 10 : 0 },
+        { step: 'AddToCart', sessions: addToCarts.length, percentage: pageViews.length > 0 ? Math.round((addToCarts.length / pageViews.length) * 100 * 10) / 10 : 0 },
+        { step: 'InitiateCheckout', sessions: checkouts.length, percentage: addToCarts.length > 0 ? Math.round((checkouts.length / addToCarts.length) * 100 * 10) / 10 : 0 },
+        { step: 'Purchase', sessions: purchases.length, percentage: checkouts.length > 0 ? Math.round((purchases.length / checkouts.length) * 100 * 10) / 10 : 0 },
+      ],
+    };
+  }
+
+  /** Campaign stats */
+  async getCampaignStats(environment?: string) {
+    const envFilter = environment ? { environment } : {};
+
+    const campaigns = await this.prisma.session.groupBy({
+      by: ['utmSource', 'utmCampaign', 'utmMedium'],
+      where: {
+        utmSource: { not: null },
+        ...envFilter,
+      },
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+      take: 50,
+    });
+
+    return campaigns.map((c) => ({
+      utm_source: c.utmSource,
+      utm_campaign: c.utmCampaign,
+      utm_medium: c.utmMedium,
+      sessions: c._count.id,
+    }));
+  }
+
+  /** Search visitor by IP — full journey */
+  async searchByIp(ip: string) {
+    const visitor = await this.prisma.visitor.findFirst({
+      where: { ip: { contains: ip } },
+      include: {
+        sessions: {
+          orderBy: { startedAt: 'desc' },
+          take: 20,
+          include: {
+            events: { orderBy: { timestamp: 'asc' } },
+            requestLogs: { orderBy: { timestamp: 'asc' } },
+            metaLogs: { orderBy: { timestamp: 'asc' } },
+          },
+        },
+      },
+    });
+
+    if (!visitor) return null;
+
+    return visitor;
+  }
 }

@@ -19,15 +19,20 @@ let ConfigService = class ConfigService {
         this.prisma = prisma;
     }
     async getOrCreateConfig() {
-        let config = await this.prisma.appConfig.findUnique({
-            where: { key: CONFIG_KEY },
-        });
-        if (!config) {
-            config = await this.prisma.appConfig.create({
-                data: { key: CONFIG_KEY, trackingEnabled: true },
+        try {
+            let config = await this.prisma.appConfig.findUnique({
+                where: { key: CONFIG_KEY },
             });
+            if (!config) {
+                config = await this.prisma.appConfig.create({
+                    data: { key: CONFIG_KEY, trackingEnabled: true },
+                });
+            }
+            return config;
         }
-        return config;
+        catch (error) {
+            return { key: CONFIG_KEY, trackingEnabled: true };
+        }
     }
     async getTrackingStatus() {
         const config = await this.getOrCreateConfig();
