@@ -6,4 +6,6 @@ export declare class RedisService implements OnModuleDestroy {
     markOnline(ip: string): Promise<void>;
     getOnlineCount(): Promise<number>;
     getOnlineUsers(): Promise<string[]>;
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string): Promise<void>;
 }

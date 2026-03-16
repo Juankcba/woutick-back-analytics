@@ -10,11 +10,13 @@ exports.ConfigModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_controller_1 = require("./config.controller");
 const config_service_1 = require("./config.service");
+const redis_module_1 = require("../redis/redis.module");
 let ConfigModule = class ConfigModule {
 };
 exports.ConfigModule = ConfigModule;
 exports.ConfigModule = ConfigModule = __decorate([
     (0, common_1.Module)({
+        imports: [redis_module_1.RedisModule],
         controllers: [config_controller_1.ConfigController],
         providers: [config_service_1.ConfigService],
     })

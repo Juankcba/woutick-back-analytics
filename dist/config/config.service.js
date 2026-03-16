@@ -12,18 +12,43 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConfigService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const redis_service_1 = require("../redis/redis.service");
 const CONFIG_KEY = 'global';
+const REDIS_TRACKING_KEY = 'tracking_enabled';
 let ConfigService = class ConfigService {
     prisma;
-    constructor(prisma) {
+    redis;
+    constructor(prisma, redis) {
         this.prisma = prisma;
+        this.redis = redis;
+        this.syncTrackingToRedis().catch(() => { });
     }
-    async getTrackingStatus() {
+    async syncTrackingToRedis() {
         try {
             const config = await this.prisma.appConfig.findUnique({
                 where: { key: CONFIG_KEY },
             });
-            return { tracking_enabled: config?.trackingEnabled ?? true };
+            const value = config?.trackingEnabled ?? true;
+            await this.redis.set(REDIS_TRACKING_KEY, value ? '1' : '0');
+        }
+        catch {
+        }
+    }
+    async getTrackingStatus() {
+        try {
+            const cached = await this.redis.get(REDIS_TRACKING_KEY);
+            if (cached !== null) {
+                return { tracking_enabled: cached === '1' };
+            }
+        }
+        catch { }
+        try {
+            const config = await this.prisma.appConfig.findUnique({
+                where: { key: CONFIG_KEY },
+            });
+            const value = config?.trackingEnabled ?? true;
+            await this.redis.set(REDIS_TRACKING_KEY, value ? '1' : '0').catch(() => { });
+            return { tracking_enabled: value };
         }
         catch {
             return { tracking_enabled: true };
@@ -31,42 +56,44 @@ let ConfigService = class ConfigService {
     }
     async setTracking(enabled) {
         try {
-            const existing = await this.prisma.appConfig.findUnique({
-                where: { key: CONFIG_KEY },
-            });
-            if (existing) {
-                const newValue = enabled !== undefined ? enabled : !existing.trackingEnabled;
-                const updated = await this.prisma.appConfig.update({
-                    where: { key: CONFIG_KEY },
-                    data: { trackingEnabled: newValue },
-                });
-                return { tracking_enabled: updated.trackingEnabled };
+            let newValue;
+            if (enabled !== undefined) {
+                newValue = enabled;
             }
             else {
-                const newValue = enabled !== undefined ? enabled : false;
-                const created = await this.prisma.appConfig.create({
-                    data: { key: CONFIG_KEY, trackingEnabled: newValue },
-                });
-                return { tracking_enabled: created.trackingEnabled };
+                const current = await this.getTrackingStatus();
+                newValue = !current.tracking_enabled;
             }
-        }
-        catch (error) {
+            await this.redis.set(REDIS_TRACKING_KEY, newValue ? '1' : '0').catch(() => { });
             try {
-                const newValue = enabled !== undefined ? enabled : true;
-                const created = await this.prisma.appConfig.create({
-                    data: { key: CONFIG_KEY, trackingEnabled: newValue },
+                const existing = await this.prisma.appConfig.findUnique({
+                    where: { key: CONFIG_KEY },
                 });
-                return { tracking_enabled: created.trackingEnabled };
+                if (existing) {
+                    await this.prisma.appConfig.update({
+                        where: { key: CONFIG_KEY },
+                        data: { trackingEnabled: newValue },
+                    });
+                }
+                else {
+                    await this.prisma.appConfig.create({
+                        data: { key: CONFIG_KEY, trackingEnabled: newValue },
+                    });
+                }
             }
             catch {
-                return { tracking_enabled: enabled ?? true };
             }
+            return { tracking_enabled: newValue };
+        }
+        catch {
+            return { tracking_enabled: enabled ?? true };
         }
     }
 };
 exports.ConfigService = ConfigService;
 exports.ConfigService = ConfigService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        redis_service_1.RedisService])
 ], ConfigService);
 //# sourceMappingURL=config.service.js.map

@@ -58,5 +58,23 @@ export class RedisService implements OnModuleDestroy {
       return [];
     }
   }
+
+  /** Generic get */
+  async get(key: string): Promise<string | null> {
+    if (!this.client) return null;
+    try {
+      return this.client.get(key);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Generic set */
+  async set(key: string, value: string): Promise<void> {
+    if (!this.client) return;
+    try {
+      await this.client.set(key, value);
+    } catch { /* silent */ }
+  }
 }
 

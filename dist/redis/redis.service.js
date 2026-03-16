@@ -73,6 +73,24 @@ let RedisService = class RedisService {
             return [];
         }
     }
+    async get(key) {
+        if (!this.client)
+            return null;
+        try {
+            return this.client.get(key);
+        }
+        catch {
+            return null;
+        }
+    }
+    async set(key, value) {
+        if (!this.client)
+            return;
+        try {
+            await this.client.set(key, value);
+        }
+        catch { }
+    }
 };
 exports.RedisService = RedisService;
 exports.RedisService = RedisService = __decorate([
