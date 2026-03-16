@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -30,9 +31,26 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
+  // Swagger / OpenAPI documentation
+  const config = new DocumentBuilder()
+    .setTitle('Woutick Analytics API')
+    .setDescription('Backend de analytics para tracking de usuarios, sesiones, eventos y Meta CAPI.')
+    .setVersion('1.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'Token' },
+      'access-token',
+    )
+    .addTag('tracking', 'Endpoints para recibir datos del frontend')
+    .addTag('analytics', 'Endpoints de lectura para el panel Vue')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document);
+
   const port = process.env.PORT || 3001;
   await app.listen(port);
   console.log(`🚀 Analytics backend running on port ${port}`);
+  console.log(`📚 Swagger docs available at http://localhost:${port}/docs`);
 }
 
 bootstrap();
