@@ -16,6 +16,20 @@ export class AnalyticsController {
     return this.analyticsService.getDashboardStats();
   }
 
+  @Get('full')
+  @ApiOperation({ summary: 'Todo el dashboard en una sola request' })
+  @ApiQuery({ name: 'environment', required: false })
+  async getFullDashboard(@Query('environment') environment?: string) {
+    const [dashboard, funnel, campaigns, visitors, metaLogs] = await Promise.all([
+      this.analyticsService.getDashboardStats(),
+      this.analyticsService.getFunnel(environment),
+      this.analyticsService.getCampaignStats(environment),
+      this.analyticsService.getVisitors(1, 20),
+      this.analyticsService.getMetaLogs({ page: 1, limit: 20 }),
+    ]);
+    return { dashboard, funnel, campaigns, visitors, metaLogs };
+  }
+
   @Get('online')
   @ApiOperation({ summary: 'Usuarios online ahora (IPs activas en últimos 5 min)' })
   async getOnlineCount() {

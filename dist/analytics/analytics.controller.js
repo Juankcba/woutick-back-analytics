@@ -25,6 +25,16 @@ let AnalyticsController = class AnalyticsController {
     async getDashboard() {
         return this.analyticsService.getDashboardStats();
     }
+    async getFullDashboard(environment) {
+        const [dashboard, funnel, campaigns, visitors, metaLogs] = await Promise.all([
+            this.analyticsService.getDashboardStats(),
+            this.analyticsService.getFunnel(environment),
+            this.analyticsService.getCampaignStats(environment),
+            this.analyticsService.getVisitors(1, 20),
+            this.analyticsService.getMetaLogs({ page: 1, limit: 20 }),
+        ]);
+        return { dashboard, funnel, campaigns, visitors, metaLogs };
+    }
     async getOnlineCount() {
         return this.analyticsService.getOnlineCount();
     }
@@ -69,6 +79,15 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getDashboard", null);
+__decorate([
+    (0, common_1.Get)('full'),
+    (0, swagger_1.ApiOperation)({ summary: 'Todo el dashboard en una sola request' }),
+    (0, swagger_1.ApiQuery)({ name: 'environment', required: false }),
+    __param(0, (0, common_1.Query)('environment')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getFullDashboard", null);
 __decorate([
     (0, common_1.Get)('online'),
     (0, swagger_1.ApiOperation)({ summary: 'Usuarios online ahora (IPs activas en últimos 5 min)' }),

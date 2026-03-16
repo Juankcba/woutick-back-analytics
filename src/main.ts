@@ -22,6 +22,7 @@ async function bootstrap() {
     ],
     methods: 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
     credentials: true,
+    maxAge: 86400, // cache preflight 24h — avoid 6× OPTIONS on every page load
   });
 
   // Global validation pipe

@@ -21,6 +21,7 @@ async function bootstrap() {
         ],
         methods: 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
         credentials: true,
+        maxAge: 86400,
     });
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,

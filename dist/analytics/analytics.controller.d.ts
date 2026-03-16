@@ -26,6 +26,90 @@ export declare class AnalyticsController {
             };
         };
     }>;
+    getFullDashboard(environment?: string): Promise<{
+        dashboard: {
+            online: {
+                online_count: number;
+                online_ips: string[];
+            };
+            totals: {
+                visitors: number;
+                sessions: number;
+                events: number;
+                meta_logs: number;
+            };
+            adblock: {
+                visitors: {
+                    total: number;
+                    with_adblock: number;
+                    percentage: number;
+                };
+                sessions: {
+                    total: number;
+                    with_adblock: number;
+                    percentage: number;
+                };
+            };
+        };
+        funnel: {
+            total_sessions: number;
+            funnel: {
+                step: string;
+                sessions: number;
+                percentage: number;
+            }[];
+        };
+        campaigns: {
+            utm_source: string | null;
+            utm_campaign: string | null;
+            utm_medium: string | null;
+            sessions: number;
+        }[];
+        visitors: {
+            visitors: ({
+                _count: {
+                    sessions: number;
+                };
+            } & {
+                ip: string;
+                fbp: string | null;
+                id: string;
+                userAgent: string | null;
+                country: string | null;
+                city: string | null;
+                hasAdblock: boolean;
+                firstSeen: Date;
+                lastSeen: Date;
+            })[];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        metaLogs: {
+            logs: {
+                route: string;
+                id: string;
+                hasAdblock: boolean;
+                eventName: string;
+                eventId: string | null;
+                timestamp: Date;
+                sessionId: string | null;
+                pixelId: string | null;
+                requestPayload: import("@prisma/client/runtime/library").JsonValue;
+                responsePayload: import("@prisma/client/runtime/library").JsonValue | null;
+                hasFbp: boolean;
+                hasFbc: boolean;
+                hasEmail: boolean;
+                hasPhone: boolean;
+                hasFn: boolean;
+                hasLn: boolean;
+                clientIp: string | null;
+            }[];
+            total: number;
+            page: number;
+            limit: number;
+        };
+    }>;
     getOnlineCount(): Promise<{
         online_count: number;
         online_ips: string[];
