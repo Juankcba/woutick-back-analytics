@@ -10,11 +10,16 @@ async function bootstrap() {
         origin: [
             'https://woutick.com',
             'https://www.woutick.com',
+            'https://dev.woutick.com',
+            'https://test.woutick.com',
             'https://panel.woutick.com',
+            'https://panel-dev.woutick.com',
+            'https://panel-test.woutick.com',
             'http://localhost:3000',
+            'http://localhost:3001',
             'http://localhost:5173',
         ],
-        methods: 'GET,POST',
+        methods: 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
         credentials: true,
     });
     app.useGlobalPipes(new common_1.ValidationPipe({
