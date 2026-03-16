@@ -18,41 +18,49 @@ let ConfigService = class ConfigService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async getOrCreateConfig() {
-        try {
-            let config = await this.prisma.appConfig.findUnique({
-                where: { key: CONFIG_KEY },
-            });
-            if (!config) {
-                config = await this.prisma.appConfig.create({
-                    data: { key: CONFIG_KEY, trackingEnabled: true },
-                });
-            }
-            return config;
-        }
-        catch (error) {
-            return { key: CONFIG_KEY, trackingEnabled: true };
-        }
-    }
     async getTrackingStatus() {
-        const config = await this.getOrCreateConfig();
-        return { tracking_enabled: config.trackingEnabled };
-    }
-    async setTracking(enabled) {
-        const config = await this.getOrCreateConfig();
-        const newValue = enabled !== undefined ? enabled : !config.trackingEnabled;
         try {
-            const updated = await this.prisma.appConfig.update({
+            const config = await this.prisma.appConfig.findUnique({
                 where: { key: CONFIG_KEY },
-                data: { trackingEnabled: newValue },
             });
-            return { tracking_enabled: updated.trackingEnabled };
+            return { tracking_enabled: config?.trackingEnabled ?? true };
         }
         catch {
-            const created = await this.prisma.appConfig.create({
-                data: { key: CONFIG_KEY, trackingEnabled: newValue },
+            return { tracking_enabled: true };
+        }
+    }
+    async setTracking(enabled) {
+        try {
+            const existing = await this.prisma.appConfig.findUnique({
+                where: { key: CONFIG_KEY },
             });
-            return { tracking_enabled: created.trackingEnabled };
+            if (existing) {
+                const newValue = enabled !== undefined ? enabled : !existing.trackingEnabled;
+                const updated = await this.prisma.appConfig.update({
+                    where: { key: CONFIG_KEY },
+                    data: { trackingEnabled: newValue },
+                });
+                return { tracking_enabled: updated.trackingEnabled };
+            }
+            else {
+                const newValue = enabled !== undefined ? enabled : false;
+                const created = await this.prisma.appConfig.create({
+                    data: { key: CONFIG_KEY, trackingEnabled: newValue },
+                });
+                return { tracking_enabled: created.trackingEnabled };
+            }
+        }
+        catch (error) {
+            try {
+                const newValue = enabled !== undefined ? enabled : true;
+                const created = await this.prisma.appConfig.create({
+                    data: { key: CONFIG_KEY, trackingEnabled: newValue },
+                });
+                return { tracking_enabled: created.trackingEnabled };
+            }
+            catch {
+                return { tracking_enabled: enabled ?? true };
+            }
         }
     }
 };
