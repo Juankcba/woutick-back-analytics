@@ -60,6 +60,7 @@ export declare class AnalyticsController {
         } & {
             fbclid: string | null;
             referer: string | null;
+            environment: string;
             id: string;
             hasAdblock: boolean;
             visitorId: string;

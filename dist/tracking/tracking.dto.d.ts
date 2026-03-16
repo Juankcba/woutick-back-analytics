@@ -16,6 +16,7 @@ export declare class TrackEventDto {
     event_slug?: string;
     fbp?: string;
     has_adblock?: boolean;
+    environment?: string;
 }
 export declare class TrackRequestLogDto {
     ip: string;
@@ -51,4 +52,5 @@ export declare class HeartbeatDto {
     url?: string;
     has_adblock?: boolean;
     fbp?: string;
+    environment?: string;
 }

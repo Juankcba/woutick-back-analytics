@@ -38,6 +38,7 @@ export declare class AnalyticsService {
         } & {
             fbclid: string | null;
             referer: string | null;
+            environment: string;
             id: string;
             hasAdblock: boolean;
             visitorId: string;

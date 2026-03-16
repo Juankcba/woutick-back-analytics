@@ -51,6 +51,7 @@ let TrackingService = TrackingService_1 = class TrackingService {
             session = await this.prisma.session.create({
                 data: {
                     visitorId: visitor.id,
+                    environment: options?.environment ?? 'production',
                     landingUrl: options?.landingUrl,
                     utmSource: options?.utmSource,
                     utmMedium: options?.utmMedium,
@@ -78,6 +79,7 @@ let TrackingService = TrackingService_1 = class TrackingService {
             hasAdblock: dto.has_adblock,
             fbp: dto.fbp,
             landingUrl: dto.url,
+            environment: dto.environment,
         });
         return { visitor_id: visitor.id, session_id: session.id };
     }
@@ -95,6 +97,7 @@ let TrackingService = TrackingService_1 = class TrackingService {
             referer: dto.referer,
             eventSlug: dto.event_slug,
             landingUrl: dto.url,
+            environment: dto.environment,
         });
         const event = await this.prisma.event.create({
             data: {

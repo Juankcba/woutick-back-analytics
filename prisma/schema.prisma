@@ -26,6 +26,7 @@ model Session {
   id            String       @id @default(auto()) @map("_id") @db.ObjectId
   visitor       Visitor      @relation(fields: [visitorId], references: [id])
   visitorId     String       @db.ObjectId @map("visitor_id")
+  environment   String       @default("production")
   startedAt     DateTime     @default(now()) @map("started_at")
   lastActivity  DateTime     @default(now()) @map("last_activity")
   landingUrl    String?      @map("landing_url")

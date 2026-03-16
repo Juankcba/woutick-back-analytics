@@ -84,6 +84,11 @@ export class TrackEventDto {
   @IsBoolean()
   @IsOptional()
   has_adblock?: boolean;
+
+  @ApiPropertyOptional({ description: 'Entorno: dev, test, production', example: 'production' })
+  @IsString()
+  @IsOptional()
+  environment?: string;
 }
 
 export class TrackRequestLogDto {
@@ -228,4 +233,9 @@ export class HeartbeatDto {
   @IsString()
   @IsOptional()
   fbp?: string;
+
+  @ApiPropertyOptional({ description: 'Entorno: dev, test, production', example: 'production' })
+  @IsString()
+  @IsOptional()
+  environment?: string;
 }

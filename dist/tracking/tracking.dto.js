@@ -30,6 +30,7 @@ class TrackEventDto {
     event_slug;
     fbp;
     has_adblock;
+    environment;
 }
 exports.TrackEventDto = TrackEventDto;
 __decorate([
@@ -132,6 +133,12 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Boolean)
 ], TrackEventDto.prototype, "has_adblock", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Entorno: dev, test, production', example: 'production' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], TrackEventDto.prototype, "environment", void 0);
 class TrackRequestLogDto {
     ip;
     session_id;
@@ -306,6 +313,7 @@ class HeartbeatDto {
     url;
     has_adblock;
     fbp;
+    environment;
 }
 exports.HeartbeatDto = HeartbeatDto;
 __decorate([
@@ -337,4 +345,10 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], HeartbeatDto.prototype, "fbp", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Entorno: dev, test, production', example: 'production' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], HeartbeatDto.prototype, "environment", void 0);
 //# sourceMappingURL=tracking.dto.js.map
