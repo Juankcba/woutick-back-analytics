@@ -108,10 +108,10 @@ export class AnalyticsController {
     });
   }
 
-  @Get('adblock-stats')
-  @ApiOperation({ summary: 'Estadísticas de uso de AdBlocker' })
-  async getAdblockStats() {
-    return this.analyticsService.getAdblockStats();
+  @Get('cookie-consent-stats')
+  @ApiOperation({ summary: 'Estadísticas de consentimiento de cookies' })
+  async getCookieConsentStats() {
+    return this.analyticsService.getCookieConsentStats();
   }
 
   @Get('funnel')

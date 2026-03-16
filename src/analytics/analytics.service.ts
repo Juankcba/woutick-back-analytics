@@ -121,37 +121,41 @@ export class AnalyticsService {
     }
   }
 
-  /** Ad-blocker statistics */
-  async getAdblockStats() {
+  /** Cookie consent statistics */
+  async getCookieConsentStats() {
     try {
-      const [totalVisitors, adblockVisitors, totalSessions, adblockSessions] =
+      const [totalVisitors, consentYes, consentNo, totalSessions, sessionConsentYes, sessionConsentNo] =
         await Promise.all([
           this.prisma.visitor.count(),
-          this.prisma.visitor.count({ where: { hasAdblock: true } }),
+          this.prisma.visitor.count({ where: { cookieConsent: true } }),
+          this.prisma.visitor.count({ where: { cookieConsent: false } }),
           this.prisma.session.count(),
-          this.prisma.session.count({ where: { hasAdblock: true } }),
+          this.prisma.session.count({ where: { cookieConsent: true } }),
+          this.prisma.session.count({ where: { cookieConsent: false } }),
         ]);
 
       return {
         visitors: {
           total: totalVisitors,
-          with_adblock: adblockVisitors,
-          percentage: totalVisitors > 0
-            ? Math.round((adblockVisitors / totalVisitors) * 100 * 10) / 10
-            : 0,
+          accepted: consentYes,
+          rejected: consentNo,
+          unknown: totalVisitors - consentYes - consentNo,
+          accepted_pct: totalVisitors > 0 ? Math.round((consentYes / totalVisitors) * 1000) / 10 : 0,
+          rejected_pct: totalVisitors > 0 ? Math.round((consentNo / totalVisitors) * 1000) / 10 : 0,
         },
         sessions: {
           total: totalSessions,
-          with_adblock: adblockSessions,
-          percentage: totalSessions > 0
-            ? Math.round((adblockSessions / totalSessions) * 100 * 10) / 10
-            : 0,
+          accepted: sessionConsentYes,
+          rejected: sessionConsentNo,
+          unknown: totalSessions - sessionConsentYes - sessionConsentNo,
+          accepted_pct: totalSessions > 0 ? Math.round((sessionConsentYes / totalSessions) * 1000) / 10 : 0,
+          rejected_pct: totalSessions > 0 ? Math.round((sessionConsentNo / totalSessions) * 1000) / 10 : 0,
         },
       };
     } catch {
       return {
-        visitors: { total: 0, with_adblock: 0, percentage: 0 },
-        sessions: { total: 0, with_adblock: 0, percentage: 0 },
+        visitors: { total: 0, accepted: 0, rejected: 0, unknown: 0, accepted_pct: 0, rejected_pct: 0 },
+        sessions: { total: 0, accepted: 0, rejected: 0, unknown: 0, accepted_pct: 0, rejected_pct: 0 },
       };
     }
   }
@@ -165,16 +169,20 @@ export class AnalyticsService {
         totalSessions,
         totalEvents,
         totalMetaLogs,
-        adblockVisitors,
-        adblockSessions,
+        consentYes,
+        consentNo,
+        sessionConsentYes,
+        sessionConsentNo,
       ] = await Promise.all([
         this.getOnlineCount(),
         this.prisma.visitor.count(),
         this.prisma.session.count(),
         this.prisma.event.count(),
         this.prisma.metaLog.count(),
-        this.prisma.visitor.count({ where: { hasAdblock: true } }),
-        this.prisma.session.count({ where: { hasAdblock: true } }),
+        this.prisma.visitor.count({ where: { cookieConsent: true } }),
+        this.prisma.visitor.count({ where: { cookieConsent: false } }),
+        this.prisma.session.count({ where: { cookieConsent: true } }),
+        this.prisma.session.count({ where: { cookieConsent: false } }),
       ]);
 
       return {
@@ -185,16 +193,22 @@ export class AnalyticsService {
           events: totalEvents,
           meta_logs: totalMetaLogs,
         },
-        adblock: {
+        cookie_consent: {
           visitors: {
             total: totalVisitors,
-            with_adblock: adblockVisitors,
-            percentage: totalVisitors > 0 ? Math.round((adblockVisitors / totalVisitors) * 100 * 10) / 10 : 0,
+            accepted: consentYes,
+            rejected: consentNo,
+            unknown: totalVisitors - consentYes - consentNo,
+            accepted_pct: totalVisitors > 0 ? Math.round((consentYes / totalVisitors) * 1000) / 10 : 0,
+            rejected_pct: totalVisitors > 0 ? Math.round((consentNo / totalVisitors) * 1000) / 10 : 0,
           },
           sessions: {
             total: totalSessions,
-            with_adblock: adblockSessions,
-            percentage: totalSessions > 0 ? Math.round((adblockSessions / totalSessions) * 100 * 10) / 10 : 0,
+            accepted: sessionConsentYes,
+            rejected: sessionConsentNo,
+            unknown: totalSessions - sessionConsentYes - sessionConsentNo,
+            accepted_pct: totalSessions > 0 ? Math.round((sessionConsentYes / totalSessions) * 1000) / 10 : 0,
+            rejected_pct: totalSessions > 0 ? Math.round((sessionConsentNo / totalSessions) * 1000) / 10 : 0,
           },
         },
       };
@@ -202,9 +216,9 @@ export class AnalyticsService {
       return {
         online: { online_count: 0, online_ips: [] },
         totals: { visitors: 0, sessions: 0, events: 0, meta_logs: 0 },
-        adblock: {
-          visitors: { total: 0, with_adblock: 0, percentage: 0 },
-          sessions: { total: 0, with_adblock: 0, percentage: 0 },
+        cookie_consent: {
+          visitors: { total: 0, accepted: 0, rejected: 0, unknown: 0, accepted_pct: 0, rejected_pct: 0 },
+          sessions: { total: 0, accepted: 0, rejected: 0, unknown: 0, accepted_pct: 0, rejected_pct: 0 },
         },
       };
     }
