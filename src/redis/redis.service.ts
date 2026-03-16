@@ -6,41 +6,57 @@ const ONLINE_SET_KEY = 'online_users';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
-  private readonly client: Redis;
+  private client: Redis | null = null;
 
   constructor() {
-    this.client = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    try {
+      const url = process.env.REDIS_URL;
+      if (url) {
+        this.client = new Redis(url, { lazyConnect: true, connectTimeout: 5000 });
+        this.client.connect().catch(() => {
+          console.warn('⚠️ Redis connection failed, disabling Redis features');
+          this.client = null;
+        });
+      } else {
+        console.warn('⚠️ REDIS_URL not set, Redis features disabled');
+      }
+    } catch {
+      console.warn('⚠️ Redis init error, Redis features disabled');
+    }
   }
 
   async onModuleDestroy() {
-    await this.client.quit();
+    await this.client?.quit();
   }
 
-  /**
-   * Mark a visitor (by IP) as online.
-   * Uses a sorted set with score = current timestamp.
-   */
   async markOnline(ip: string): Promise<void> {
-    const now = Date.now();
-    await this.client.zadd(ONLINE_SET_KEY, now, ip);
+    if (!this.client) return;
+    try {
+      const now = Date.now();
+      await this.client.zadd(ONLINE_SET_KEY, now, ip);
+    } catch { /* Redis unavailable */ }
   }
 
-  /**
-   * Get count of online users (active in last 5 minutes).
-   */
   async getOnlineCount(): Promise<number> {
-    const cutoff = Date.now() - ONLINE_TTL_SECONDS * 1000;
-    // Remove stale entries
-    await this.client.zremrangebyscore(ONLINE_SET_KEY, '-inf', cutoff);
-    return this.client.zcard(ONLINE_SET_KEY);
+    if (!this.client) return 0;
+    try {
+      const cutoff = Date.now() - ONLINE_TTL_SECONDS * 1000;
+      await this.client.zremrangebyscore(ONLINE_SET_KEY, '-inf', cutoff);
+      return this.client.zcard(ONLINE_SET_KEY);
+    } catch {
+      return 0;
+    }
   }
 
-  /**
-   * Get list of online IPs (active in last 5 minutes).
-   */
   async getOnlineUsers(): Promise<string[]> {
-    const cutoff = Date.now() - ONLINE_TTL_SECONDS * 1000;
-    await this.client.zremrangebyscore(ONLINE_SET_KEY, '-inf', cutoff);
-    return this.client.zrangebyscore(ONLINE_SET_KEY, cutoff, '+inf');
+    if (!this.client) return [];
+    try {
+      const cutoff = Date.now() - ONLINE_TTL_SECONDS * 1000;
+      await this.client.zremrangebyscore(ONLINE_SET_KEY, '-inf', cutoff);
+      return this.client.zrangebyscore(ONLINE_SET_KEY, cutoff, '+inf');
+    } catch {
+      return [];
+    }
   }
 }
+

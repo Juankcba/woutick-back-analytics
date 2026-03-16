@@ -18,26 +18,60 @@ const ioredis_1 = __importDefault(require("ioredis"));
 const ONLINE_TTL_SECONDS = 300;
 const ONLINE_SET_KEY = 'online_users';
 let RedisService = class RedisService {
-    client;
+    client = null;
     constructor() {
-        this.client = new ioredis_1.default(process.env.REDIS_URL || 'redis://localhost:6379');
+        try {
+            const url = process.env.REDIS_URL;
+            if (url) {
+                this.client = new ioredis_1.default(url, { lazyConnect: true, connectTimeout: 5000 });
+                this.client.connect().catch(() => {
+                    console.warn('⚠️ Redis connection failed, disabling Redis features');
+                    this.client = null;
+                });
+            }
+            else {
+                console.warn('⚠️ REDIS_URL not set, Redis features disabled');
+            }
+        }
+        catch {
+            console.warn('⚠️ Redis init error, Redis features disabled');
+        }
     }
     async onModuleDestroy() {
-        await this.client.quit();
+        await this.client?.quit();
     }
     async markOnline(ip) {
-        const now = Date.now();
-        await this.client.zadd(ONLINE_SET_KEY, now, ip);
+        if (!this.client)
+            return;
+        try {
+            const now = Date.now();
+            await this.client.zadd(ONLINE_SET_KEY, now, ip);
+        }
+        catch { }
     }
     async getOnlineCount() {
-        const cutoff = Date.now() - ONLINE_TTL_SECONDS * 1000;
-        await this.client.zremrangebyscore(ONLINE_SET_KEY, '-inf', cutoff);
-        return this.client.zcard(ONLINE_SET_KEY);
+        if (!this.client)
+            return 0;
+        try {
+            const cutoff = Date.now() - ONLINE_TTL_SECONDS * 1000;
+            await this.client.zremrangebyscore(ONLINE_SET_KEY, '-inf', cutoff);
+            return this.client.zcard(ONLINE_SET_KEY);
+        }
+        catch {
+            return 0;
+        }
     }
     async getOnlineUsers() {
-        const cutoff = Date.now() - ONLINE_TTL_SECONDS * 1000;
-        await this.client.zremrangebyscore(ONLINE_SET_KEY, '-inf', cutoff);
-        return this.client.zrangebyscore(ONLINE_SET_KEY, cutoff, '+inf');
+        if (!this.client)
+            return [];
+        try {
+            const cutoff = Date.now() - ONLINE_TTL_SECONDS * 1000;
+            await this.client.zremrangebyscore(ONLINE_SET_KEY, '-inf', cutoff);
+            return this.client.zrangebyscore(ONLINE_SET_KEY, cutoff, '+inf');
+        }
+        catch {
+            return [];
+        }
     }
 };
 exports.RedisService = RedisService;
