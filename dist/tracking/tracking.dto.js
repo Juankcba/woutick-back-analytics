@@ -30,6 +30,10 @@ class TrackEventDto {
     event_slug;
     fbp;
     has_adblock;
+    cookie_consent;
+    name;
+    phone;
+    email;
     environment;
 }
 exports.TrackEventDto = TrackEventDto;
@@ -134,6 +138,30 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Boolean)
 ], TrackEventDto.prototype, "has_adblock", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '¿El usuario aceptó cookies?' }),
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], TrackEventDto.prototype, "cookie_consent", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Nombre del usuario (si disponible)' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], TrackEventDto.prototype, "name", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Teléfono del usuario (si disponible)' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], TrackEventDto.prototype, "phone", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Email del usuario (si disponible)' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], TrackEventDto.prototype, "email", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'Entorno: dev, test, production', example: 'production' }),
     (0, class_validator_1.IsString)(),
@@ -320,6 +348,7 @@ class HeartbeatDto {
     user_agent;
     url;
     has_adblock;
+    cookie_consent;
     fbp;
     environment;
 }
@@ -348,6 +377,12 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Boolean)
 ], HeartbeatDto.prototype, "has_adblock", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '¿El usuario aceptó cookies?' }),
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], HeartbeatDto.prototype, "cookie_consent", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'Cookie _fbp de Meta' }),
     (0, class_validator_1.IsString)(),

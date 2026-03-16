@@ -28,6 +28,7 @@ export class TrackingService {
     options?: {
       userAgent?: string;
       hasAdblock?: boolean;
+      cookieConsent?: boolean;
       fbp?: string;
       utmSource?: string;
       utmMedium?: string;
@@ -38,6 +39,9 @@ export class TrackingService {
       eventSlug?: string;
       landingUrl?: string;
       environment?: string;
+      name?: string;
+      phone?: string;
+      email?: string;
     },
   ) {
     // Upsert visitor
@@ -47,13 +51,21 @@ export class TrackingService {
         lastSeen: new Date(),
         ...(options?.userAgent && { userAgent: options.userAgent }),
         ...(options?.hasAdblock !== undefined && { hasAdblock: options.hasAdblock }),
+        ...(options?.cookieConsent !== undefined && { cookieConsent: options.cookieConsent }),
         ...(options?.fbp && { fbp: options.fbp }),
+        ...(options?.name && { name: options.name }),
+        ...(options?.phone && { phone: options.phone }),
+        ...(options?.email && { email: options.email }),
       },
       create: {
         ip,
         userAgent: options?.userAgent,
         hasAdblock: options?.hasAdblock ?? false,
+        cookieConsent: options?.cookieConsent,
         fbp: options?.fbp,
+        name: options?.name,
+        phone: options?.phone,
+        email: options?.email,
       },
     });
 
@@ -82,6 +94,7 @@ export class TrackingService {
           referer: options?.referer,
           eventSlug: options?.eventSlug,
           hasAdblock: options?.hasAdblock ?? false,
+          cookieConsent: options?.cookieConsent,
         },
       });
     } else {
@@ -104,6 +117,7 @@ export class TrackingService {
     const { visitor, session } = await this.getOrCreateVisitorAndSession(dto.ip!, {
       userAgent: dto.user_agent,
       hasAdblock: dto.has_adblock,
+      cookieConsent: dto.cookie_consent,
       fbp: dto.fbp,
       landingUrl: dto.url,
       environment: dto.environment,
@@ -121,6 +135,7 @@ export class TrackingService {
     const { session } = await this.getOrCreateVisitorAndSession(dto.ip!, {
       userAgent: dto.user_agent,
       hasAdblock: dto.has_adblock,
+      cookieConsent: dto.cookie_consent,
       fbp: dto.fbp,
       utmSource: dto.utm_source,
       utmMedium: dto.utm_medium,
@@ -131,6 +146,9 @@ export class TrackingService {
       eventSlug: dto.event_slug,
       landingUrl: dto.url,
       environment: dto.environment,
+      name: dto.name,
+      phone: dto.phone,
+      email: dto.email,
     });
 
     const event = await this.prisma.event.create({

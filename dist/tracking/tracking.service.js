@@ -30,13 +30,21 @@ let TrackingService = TrackingService_1 = class TrackingService {
                 lastSeen: new Date(),
                 ...(options?.userAgent && { userAgent: options.userAgent }),
                 ...(options?.hasAdblock !== undefined && { hasAdblock: options.hasAdblock }),
+                ...(options?.cookieConsent !== undefined && { cookieConsent: options.cookieConsent }),
                 ...(options?.fbp && { fbp: options.fbp }),
+                ...(options?.name && { name: options.name }),
+                ...(options?.phone && { phone: options.phone }),
+                ...(options?.email && { email: options.email }),
             },
             create: {
                 ip,
                 userAgent: options?.userAgent,
                 hasAdblock: options?.hasAdblock ?? false,
+                cookieConsent: options?.cookieConsent,
                 fbp: options?.fbp,
+                name: options?.name,
+                phone: options?.phone,
+                email: options?.email,
             },
         });
         const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS);
@@ -61,6 +69,7 @@ let TrackingService = TrackingService_1 = class TrackingService {
                     referer: options?.referer,
                     eventSlug: options?.eventSlug,
                     hasAdblock: options?.hasAdblock ?? false,
+                    cookieConsent: options?.cookieConsent,
                 },
             });
         }
@@ -77,6 +86,7 @@ let TrackingService = TrackingService_1 = class TrackingService {
         const { visitor, session } = await this.getOrCreateVisitorAndSession(dto.ip, {
             userAgent: dto.user_agent,
             hasAdblock: dto.has_adblock,
+            cookieConsent: dto.cookie_consent,
             fbp: dto.fbp,
             landingUrl: dto.url,
             environment: dto.environment,
@@ -88,6 +98,7 @@ let TrackingService = TrackingService_1 = class TrackingService {
         const { session } = await this.getOrCreateVisitorAndSession(dto.ip, {
             userAgent: dto.user_agent,
             hasAdblock: dto.has_adblock,
+            cookieConsent: dto.cookie_consent,
             fbp: dto.fbp,
             utmSource: dto.utm_source,
             utmMedium: dto.utm_medium,
@@ -98,6 +109,9 @@ let TrackingService = TrackingService_1 = class TrackingService {
             eventSlug: dto.event_slug,
             landingUrl: dto.url,
             environment: dto.environment,
+            name: dto.name,
+            phone: dto.phone,
+            email: dto.email,
         });
         const event = await this.prisma.event.create({
             data: {

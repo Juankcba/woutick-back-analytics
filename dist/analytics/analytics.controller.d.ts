@@ -73,11 +73,15 @@ export declare class AnalyticsController {
             } & {
                 ip: string;
                 fbp: string | null;
+                name: string | null;
+                phone: string | null;
+                email: string | null;
                 id: string;
                 userAgent: string | null;
                 country: string | null;
                 city: string | null;
                 hasAdblock: boolean;
+                cookieConsent: boolean | null;
                 firstSeen: Date;
                 lastSeen: Date;
             })[];
@@ -90,6 +94,7 @@ export declare class AnalyticsController {
                 route: string;
                 id: string;
                 hasAdblock: boolean;
+                cookieConsent: boolean | null;
                 eventName: string;
                 eventId: string | null;
                 timestamp: Date;
@@ -123,11 +128,15 @@ export declare class AnalyticsController {
         } & {
             ip: string;
             fbp: string | null;
+            name: string | null;
+            phone: string | null;
+            email: string | null;
             id: string;
             userAgent: string | null;
             country: string | null;
             city: string | null;
             hasAdblock: boolean;
+            cookieConsent: boolean | null;
             firstSeen: Date;
             lastSeen: Date;
         })[];
@@ -148,6 +157,7 @@ export declare class AnalyticsController {
             environment: string;
             id: string;
             hasAdblock: boolean;
+            cookieConsent: boolean | null;
             visitorId: string;
             startedAt: Date;
             lastActivity: Date;
@@ -193,6 +203,7 @@ export declare class AnalyticsController {
             route: string;
             id: string;
             hasAdblock: boolean;
+            cookieConsent: boolean | null;
             eventName: string;
             eventId: string | null;
             timestamp: Date;
@@ -266,6 +277,7 @@ export declare class AnalyticsController {
                 route: string;
                 id: string;
                 hasAdblock: boolean;
+                cookieConsent: boolean | null;
                 eventName: string;
                 eventId: string | null;
                 timestamp: Date;
@@ -288,6 +300,7 @@ export declare class AnalyticsController {
             environment: string;
             id: string;
             hasAdblock: boolean;
+            cookieConsent: boolean | null;
             visitorId: string;
             startedAt: Date;
             lastActivity: Date;
@@ -301,11 +314,15 @@ export declare class AnalyticsController {
     } & {
         ip: string;
         fbp: string | null;
+        name: string | null;
+        phone: string | null;
+        email: string | null;
         id: string;
         userAgent: string | null;
         country: string | null;
         city: string | null;
         hasAdblock: boolean;
+        cookieConsent: boolean | null;
         firstSeen: Date;
         lastSeen: Date;
     }) | null>;

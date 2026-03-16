@@ -201,7 +201,8 @@ let AnalyticsService = class AnalyticsService {
         try {
             const envFilter = environment ? { session: { environment } } : {};
             const sessionEnvFilter = environment ? { environment } : {};
-            const [pageViews, addToCarts, checkouts, purchases] = await Promise.all([
+            const [totalSessions, pageViewSessions, addToCartSessions, checkoutSessions, purchaseSessions] = await Promise.all([
+                this.prisma.session.count({ where: sessionEnvFilter }),
                 this.prisma.event.groupBy({
                     by: ['sessionId'],
                     where: { eventName: 'PageView', ...envFilter },
@@ -219,14 +220,14 @@ let AnalyticsService = class AnalyticsService {
                     where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] }, ...envFilter },
                 }),
             ]);
-            const totalSessions = await this.prisma.session.count({ where: sessionEnvFilter });
+            const pct = (count) => totalSessions > 0 ? Math.round((count / totalSessions) * 1000) / 10 : 0;
             return {
                 total_sessions: totalSessions,
                 funnel: [
-                    { step: 'PageView', sessions: pageViews.length, percentage: totalSessions > 0 ? Math.round((pageViews.length / totalSessions) * 100 * 10) / 10 : 0 },
-                    { step: 'AddToCart', sessions: addToCarts.length, percentage: pageViews.length > 0 ? Math.round((addToCarts.length / pageViews.length) * 100 * 10) / 10 : 0 },
-                    { step: 'InitiateCheckout', sessions: checkouts.length, percentage: addToCarts.length > 0 ? Math.round((checkouts.length / addToCarts.length) * 100 * 10) / 10 : 0 },
-                    { step: 'Purchase', sessions: purchases.length, percentage: checkouts.length > 0 ? Math.round((purchases.length / checkouts.length) * 100 * 10) / 10 : 0 },
+                    { step: 'PageView', sessions: pageViewSessions.length, percentage: pct(pageViewSessions.length) },
+                    { step: 'AddToCart', sessions: addToCartSessions.length, percentage: pct(addToCartSessions.length) },
+                    { step: 'InitiateCheckout', sessions: checkoutSessions.length, percentage: pct(checkoutSessions.length) },
+                    { step: 'Purchase', sessions: purchaseSessions.length, percentage: pct(purchaseSessions.length) },
                 ],
             };
         }

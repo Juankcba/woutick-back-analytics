@@ -8,16 +8,20 @@ datasource db {
 }
 
 model Visitor {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  ip         String   @unique
-  userAgent  String?  @map("user_agent")
-  country    String?
-  city       String?
-  hasAdblock Boolean  @default(false) @map("has_adblock")
-  fbp        String?
-  firstSeen  DateTime @default(now()) @map("first_seen")
-  lastSeen   DateTime @updatedAt @map("last_seen")
-  sessions   Session[]
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  ip             String   @unique
+  userAgent      String?  @map("user_agent")
+  country        String?
+  city           String?
+  name           String?
+  phone          String?
+  email          String?
+  hasAdblock     Boolean  @default(false) @map("has_adblock")
+  cookieConsent  Boolean? @map("cookie_consent")
+  fbp            String?
+  firstSeen      DateTime @default(now()) @map("first_seen")
+  lastSeen       DateTime @updatedAt @map("last_seen")
+  sessions       Session[]
 
   @@map("visitors")
 }
@@ -38,6 +42,7 @@ model Session {
   referer       String?
   eventSlug     String?      @map("event_slug")
   hasAdblock    Boolean      @default(false) @map("has_adblock")
+  cookieConsent Boolean?     @map("cookie_consent")
   events        Event[]
   requestLogs   RequestLog[]
   metaLogs      MetaLog[]
@@ -93,6 +98,7 @@ model MetaLog {
   hasLn            Boolean  @default(false) @map("has_ln")
   clientIp         String?  @map("client_ip")
   hasAdblock       Boolean  @default(false) @map("has_adblock")
+  cookieConsent    Boolean? @map("cookie_consent")
   timestamp        DateTime @default(now())
 
   @@map("meta_logs")

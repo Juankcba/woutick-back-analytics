@@ -86,6 +86,26 @@ export class TrackEventDto {
   @IsOptional()
   has_adblock?: boolean;
 
+  @ApiPropertyOptional({ description: '¿El usuario aceptó cookies?' })
+  @IsBoolean()
+  @IsOptional()
+  cookie_consent?: boolean;
+
+  @ApiPropertyOptional({ description: 'Nombre del usuario (si disponible)' })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Teléfono del usuario (si disponible)' })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @ApiPropertyOptional({ description: 'Email del usuario (si disponible)' })
+  @IsString()
+  @IsOptional()
+  email?: string;
+
   @ApiPropertyOptional({ description: 'Entorno: dev, test, production', example: 'production' })
   @IsString()
   @IsOptional()
@@ -235,6 +255,11 @@ export class HeartbeatDto {
   @IsBoolean()
   @IsOptional()
   has_adblock?: boolean;
+
+  @ApiPropertyOptional({ description: '¿El usuario aceptó cookies?' })
+  @IsBoolean()
+  @IsOptional()
+  cookie_consent?: boolean;
 
   @ApiPropertyOptional({ description: 'Cookie _fbp de Meta' })
   @IsString()

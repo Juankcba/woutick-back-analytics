@@ -16,6 +16,10 @@ export declare class TrackEventDto {
     event_slug?: string;
     fbp?: string;
     has_adblock?: boolean;
+    cookie_consent?: boolean;
+    name?: string;
+    phone?: string;
+    email?: string;
     environment?: string;
 }
 export declare class TrackRequestLogDto {
@@ -52,6 +56,7 @@ export declare class HeartbeatDto {
     user_agent?: string;
     url?: string;
     has_adblock?: boolean;
+    cookie_consent?: boolean;
     fbp?: string;
     environment?: string;
 }
