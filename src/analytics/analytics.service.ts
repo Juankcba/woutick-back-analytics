@@ -238,44 +238,48 @@ export class AnalyticsService {
     }
   }
 
-  /** Funnel de conversión */
+  /** Funnel de conversión — optimized: 2 DB queries instead of 5 */
   async getFunnel(environment?: string, dateFrom?: string, dateTo?: string) {
     try {
-      const envFilter = environment ? { session: { environment } } : {};
       const sessionEnvFilter = environment ? { environment } : {};
       const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
       const eventDateFilter = this.buildDateFilter(dateFrom, dateTo);
+      const envFilter = environment ? { session: { environment } } : {};
 
-      // Count unique sessions that have each event type
-      const [totalSessions, pageViewSessions, addToCartSessions, checkoutSessions, purchaseSessions] = await Promise.all([
+      // 2 queries: total sessions + all funnel-relevant events
+      const [totalSessions, events] = await Promise.all([
         this.prisma.session.count({ where: { ...sessionEnvFilter, ...sessionDateFilter } }),
-        this.prisma.event.groupBy({
-          by: ['sessionId'],
-          where: { eventName: 'PageView', ...envFilter, ...eventDateFilter },
-        }),
-        this.prisma.event.groupBy({
-          by: ['sessionId'],
-          where: { eventName: 'AddToCart', ...envFilter, ...eventDateFilter },
-        }),
-        this.prisma.event.groupBy({
-          by: ['sessionId'],
-          where: { eventName: 'InitiateCheckout', ...envFilter, ...eventDateFilter },
-        }),
-        this.prisma.event.groupBy({
-          by: ['sessionId'],
-          where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] }, ...envFilter, ...eventDateFilter },
+        this.prisma.event.findMany({
+          where: {
+            eventName: { in: ['PageView', 'AddToCart', 'InitiateCheckout', 'Purchase', 'PurchaseConfirm'] },
+            ...envFilter,
+            ...eventDateFilter,
+          },
+          select: { eventName: true, sessionId: true },
         }),
       ]);
+
+      // Count unique sessions per event type
+      const sessionSets: Record<string, Set<string>> = {
+        PageView: new Set(),
+        AddToCart: new Set(),
+        InitiateCheckout: new Set(),
+        Purchase: new Set(),
+      };
+      for (const e of events) {
+        const step = e.eventName === 'PurchaseConfirm' ? 'Purchase' : e.eventName;
+        sessionSets[step]?.add(e.sessionId);
+      }
 
       const pct = (count: number) => totalSessions > 0 ? Math.round((count / totalSessions) * 1000) / 10 : 0;
 
       return {
         total_sessions: totalSessions,
         funnel: [
-          { step: 'PageView', sessions: pageViewSessions.length, percentage: pct(pageViewSessions.length) },
-          { step: 'AddToCart', sessions: addToCartSessions.length, percentage: pct(addToCartSessions.length) },
-          { step: 'InitiateCheckout', sessions: checkoutSessions.length, percentage: pct(checkoutSessions.length) },
-          { step: 'Purchase', sessions: purchaseSessions.length, percentage: pct(purchaseSessions.length) },
+          { step: 'PageView', sessions: sessionSets.PageView.size, percentage: pct(sessionSets.PageView.size) },
+          { step: 'AddToCart', sessions: sessionSets.AddToCart.size, percentage: pct(sessionSets.AddToCart.size) },
+          { step: 'InitiateCheckout', sessions: sessionSets.InitiateCheckout.size, percentage: pct(sessionSets.InitiateCheckout.size) },
+          { step: 'Purchase', sessions: sessionSets.Purchase.size, percentage: pct(sessionSets.Purchase.size) },
         ],
       };
     } catch {
@@ -283,29 +287,46 @@ export class AnalyticsService {
     }
   }
 
-  /** Campaign stats with purchase counts */
+  /** Campaign stats with purchase counts — optimized: only 2 DB queries */
   async getCampaignStats(environment?: string, dateFrom?: string, dateTo?: string) {
     try {
       const envFilter = environment ? { environment } : {};
       const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
       const eventDateFilter = this.buildDateFilter(dateFrom, dateTo);
 
-      // Use findMany instead of groupBy (Prisma groupBy is unreliable with MongoDB optional fields)
-      const sessions = await this.prisma.session.findMany({
-        where: {
-          utmSource: { not: null },
-          ...envFilter,
-          ...sessionDateFilter,
-        },
-        select: {
-          utmSource: true,
-          utmCampaign: true,
-          utmMedium: true,
-          visitor: { select: { ip: true } },
-        },
-      });
+      // Query 1: All sessions with UTM (lightweight select)
+      // Query 2: All purchase events from UTM sessions (to count per campaign)
+      const [sessions, purchaseEvents] = await Promise.all([
+        this.prisma.session.findMany({
+          where: { utmSource: { not: null }, ...envFilter, ...sessionDateFilter },
+          select: {
+            id: true,
+            utmSource: true,
+            utmCampaign: true,
+            utmMedium: true,
+            visitor: { select: { ip: true } },
+          },
+        }),
+        this.prisma.event.findMany({
+          where: {
+            eventName: { in: ['Purchase', 'PurchaseConfirm'] },
+            ...eventDateFilter,
+            session: { utmSource: { not: null }, ...envFilter },
+          },
+          select: {
+            session: { select: { utmSource: true, utmCampaign: true, utmMedium: true } },
+          },
+        }),
+      ]);
 
-      // Manual grouping by utm combo
+      // Build purchase count map by utm key
+      const purchaseMap = new Map<string, number>();
+      for (const pe of purchaseEvents) {
+        const key = `${pe.session.utmSource}|${pe.session.utmCampaign || ''}|${pe.session.utmMedium || ''}`;
+        purchaseMap.set(key, (purchaseMap.get(key) || 0) + 1);
+      }
+
+      // Group sessions by utm combo
       const groupMap = new Map<string, { utmSource: string; utmCampaign: string | null; utmMedium: string | null; count: number; ips: Set<string> }>();
       for (const s of sessions) {
         const key = `${s.utmSource}|${s.utmCampaign || ''}|${s.utmMedium || ''}`;
@@ -317,36 +338,18 @@ export class AnalyticsService {
         if (s.visitor?.ip) g.ips.add(s.visitor.ip);
       }
 
-      // Sort by session count desc, take top 50
-      const grouped = [...groupMap.values()].sort((a, b) => b.count - a.count).slice(0, 50);
-
-      // Get purchase counts per campaign combination
-      const campaignsWithDetails = await Promise.all(
-        grouped.map(async (c) => {
-          const purchases = await this.prisma.event.count({
-            where: {
-              eventName: { in: ['Purchase', 'PurchaseConfirm'] },
-              ...eventDateFilter,
-              session: {
-                utmSource: c.utmSource,
-                utmCampaign: c.utmCampaign,
-                utmMedium: c.utmMedium,
-                ...envFilter,
-              },
-            },
-          });
-          return {
-            utm_source: c.utmSource,
-            utm_campaign: c.utmCampaign,
-            utm_medium: c.utmMedium,
-            sessions: c.count,
-            purchases,
-            ips: [...c.ips],
-          };
-        }),
-      );
-
-      return campaignsWithDetails;
+      // Sort by session count desc, take top 50, attach purchases
+      return [...groupMap.entries()]
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 50)
+        .map(([key, c]) => ({
+          utm_source: c.utmSource,
+          utm_campaign: c.utmCampaign,
+          utm_medium: c.utmMedium,
+          sessions: c.count,
+          purchases: purchaseMap.get(key) || 0,
+          ips: [...c.ips],
+        }));
     } catch {
       return [];
     }
