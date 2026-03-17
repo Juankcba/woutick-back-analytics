@@ -325,22 +325,42 @@ export class AnalyticsService {
         for (const vid of g.visitorIds) allVisitorIds.add(vid);
       }
 
-      // Query 2: All purchase events from campaign visitors (ANY session, not just UTM sessions)
+      // Query 2: All PurchaseConfirm events from campaign visitors with details
       const purchaseEvents = allVisitorIds.size > 0
         ? await this.prisma.event.findMany({
             where: {
               eventName: 'PurchaseConfirm',
               session: { visitorId: { in: [...allVisitorIds] } },
             },
-            select: { session: { select: { visitorId: true } } },
+            select: {
+              url: true,
+              timestamp: true,
+              session: {
+                select: {
+                  visitorId: true,
+                  utmSource: true,
+                  utmCampaign: true,
+                  utmMedium: true,
+                  visitor: { select: { ip: true } },
+                },
+              },
+            },
           })
         : [];
 
-      // Count purchases per visitorId
-      const purchasesByVisitor = new Map<string, number>();
+      // Group purchase details per visitorId
+      const purchasesByVisitor = new Map<string, any[]>();
       for (const pe of purchaseEvents) {
         const vid = pe.session.visitorId;
-        purchasesByVisitor.set(vid, (purchasesByVisitor.get(vid) || 0) + 1);
+        if (!purchasesByVisitor.has(vid)) purchasesByVisitor.set(vid, []);
+        purchasesByVisitor.get(vid)!.push({
+          ip: pe.session.visitor?.ip || null,
+          url: pe.url || null,
+          timestamp: pe.timestamp,
+          utm_source: pe.session.utmSource,
+          utm_campaign: pe.session.utmCampaign,
+          utm_medium: pe.session.utmMedium,
+        });
       }
 
       // Sort by session count desc, take top 50, compute purchases per campaign via visitors
@@ -348,16 +368,18 @@ export class AnalyticsService {
         .sort((a, b) => b[1].count - a[1].count)
         .slice(0, 50)
         .map(([, c]) => {
-          let purchases = 0;
+          const purchaseDetails: any[] = [];
           for (const vid of c.visitorIds) {
-            purchases += purchasesByVisitor.get(vid) || 0;
+            const details = purchasesByVisitor.get(vid);
+            if (details) purchaseDetails.push(...details);
           }
           return {
             utm_source: c.utmSource,
             utm_campaign: c.utmCampaign,
             utm_medium: c.utmMedium,
             sessions: c.count,
-            purchases,
+            purchases: purchaseDetails.length,
+            purchaseDetails,
             ips: [...c.ips],
           };
         });
