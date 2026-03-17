@@ -19,13 +19,19 @@ export class AnalyticsController {
   @Get('full')
   @ApiOperation({ summary: 'Todo el dashboard en una sola request' })
   @ApiQuery({ name: 'environment', required: false })
-  async getFullDashboard(@Query('environment') environment?: string) {
+  @ApiQuery({ name: 'dateFrom', required: false, example: '2026-03-01' })
+  @ApiQuery({ name: 'dateTo', required: false, example: '2026-03-17' })
+  async getFullDashboard(
+    @Query('environment') environment?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
     const [dashboard, funnel, campaigns, visitors, metaLogs] = await Promise.all([
-      this.analyticsService.getDashboardStats(),
-      this.analyticsService.getFunnel(environment),
-      this.analyticsService.getCampaignStats(environment),
-      this.analyticsService.getVisitors(1, 20),
-      this.analyticsService.getMetaLogs({ page: 1, limit: 20 }),
+      this.analyticsService.getDashboardStats(dateFrom, dateTo),
+      this.analyticsService.getFunnel(environment, dateFrom, dateTo),
+      this.analyticsService.getCampaignStats(environment, dateFrom, dateTo),
+      this.analyticsService.getVisitors(1, 20, dateFrom, dateTo),
+      this.analyticsService.getMetaLogs({ page: 1, limit: 20, dateFrom, dateTo }),
     ]);
     return { dashboard, funnel, campaigns, visitors, metaLogs };
   }

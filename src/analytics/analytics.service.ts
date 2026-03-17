@@ -9,6 +9,19 @@ export class AnalyticsService {
     private readonly redis: RedisService,
   ) {}
 
+  /** Build a Prisma date range filter for a given timestamp field */
+  private buildDateFilter(dateFrom?: string, dateTo?: string, field = 'timestamp') {
+    if (!dateFrom && !dateTo) return {};
+    const filter: any = {};
+    if (dateFrom) filter.gte = new Date(dateFrom);
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      filter.lte = to;
+    }
+    return { [field]: filter };
+  }
+
   /** Online user count from Redis */
   async getOnlineCount() {
     try {
@@ -21,11 +34,14 @@ export class AnalyticsService {
   }
 
   /** List visitors with pagination */
-  async getVisitors(page = 1, limit = 50) {
+  async getVisitors(page = 1, limit = 50, dateFrom?: string, dateTo?: string) {
     try {
       const skip = (page - 1) * limit;
+      const dateFilter = this.buildDateFilter(dateFrom, dateTo, 'lastSeen');
+      const where: any = { ...dateFilter };
       const [visitors, total] = await Promise.all([
         this.prisma.visitor.findMany({
+          where,
           orderBy: { lastSeen: 'desc' },
           skip,
           take: limit,
@@ -38,7 +54,7 @@ export class AnalyticsService {
             },
           },
         }),
-        this.prisma.visitor.count(),
+        this.prisma.visitor.count({ where }),
       ]);
 
       // Flatten latest session data onto visitor object
@@ -115,13 +131,16 @@ export class AnalyticsService {
     has_adblock?: boolean;
     page?: number;
     limit?: number;
+    dateFrom?: string;
+    dateTo?: string;
   }) {
     const page = filters?.page || 1;
     const limit = filters?.limit || 50;
 
     try {
       const skip = (page - 1) * limit;
-      const where: any = {};
+      const dateFilter = this.buildDateFilter(filters?.dateFrom, filters?.dateTo);
+      const where: any = { ...dateFilter };
       if (filters?.event_name) where.eventName = filters.event_name;
       if (filters?.has_adblock !== undefined) where.hasAdblock = filters.has_adblock;
 
@@ -180,8 +199,11 @@ export class AnalyticsService {
   }
 
   /** General dashboard stats — single parallel batch */
-  async getDashboardStats() {
+  async getDashboardStats(dateFrom?: string, dateTo?: string) {
     try {
+      const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
+      const eventDateFilter = this.buildDateFilter(dateFrom, dateTo);
+      const visitorDateFilter = this.buildDateFilter(dateFrom, dateTo, 'lastSeen');
       const [
         onlineData,
         totalVisitors,
@@ -189,21 +211,13 @@ export class AnalyticsService {
         totalEvents,
         totalMetaLogs,
         totalPurchases,
-        consentYes,
-        consentNo,
-        sessionConsentYes,
-        sessionConsentNo,
       ] = await Promise.all([
         this.getOnlineCount(),
-        this.prisma.visitor.count(),
-        this.prisma.session.count(),
-        this.prisma.event.count(),
-        this.prisma.metaLog.count(),
-        this.prisma.event.count({ where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] } } }),
-        this.prisma.visitor.count({ where: { cookieConsent: true } }),
-        this.prisma.visitor.count({ where: { cookieConsent: false } }),
-        this.prisma.session.count({ where: { cookieConsent: true } }),
-        this.prisma.session.count({ where: { cookieConsent: false } }),
+        this.prisma.visitor.count({ where: visitorDateFilter }),
+        this.prisma.session.count({ where: sessionDateFilter }),
+        this.prisma.event.count({ where: eventDateFilter }),
+        this.prisma.metaLog.count({ where: eventDateFilter }),
+        this.prisma.event.count({ where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] }, ...eventDateFilter } }),
       ]);
 
       return {
@@ -215,61 +229,41 @@ export class AnalyticsService {
           meta_logs: totalMetaLogs,
           purchases: totalPurchases,
         },
-        cookie_consent: {
-          visitors: {
-            total: totalVisitors,
-            accepted: consentYes,
-            rejected: consentNo,
-            unknown: totalVisitors - consentYes - consentNo,
-            accepted_pct: totalVisitors > 0 ? Math.round((consentYes / totalVisitors) * 1000) / 10 : 0,
-            rejected_pct: totalVisitors > 0 ? Math.round((consentNo / totalVisitors) * 1000) / 10 : 0,
-          },
-          sessions: {
-            total: totalSessions,
-            accepted: sessionConsentYes,
-            rejected: sessionConsentNo,
-            unknown: totalSessions - sessionConsentYes - sessionConsentNo,
-            accepted_pct: totalSessions > 0 ? Math.round((sessionConsentYes / totalSessions) * 1000) / 10 : 0,
-            rejected_pct: totalSessions > 0 ? Math.round((sessionConsentNo / totalSessions) * 1000) / 10 : 0,
-          },
-        },
       };
     } catch {
       return {
         online: { online_count: 0, online_ips: [] },
         totals: { visitors: 0, sessions: 0, events: 0, meta_logs: 0, purchases: 0 },
-        cookie_consent: {
-          visitors: { total: 0, accepted: 0, rejected: 0, unknown: 0, accepted_pct: 0, rejected_pct: 0 },
-          sessions: { total: 0, accepted: 0, rejected: 0, unknown: 0, accepted_pct: 0, rejected_pct: 0 },
-        },
       };
     }
   }
 
   /** Funnel de conversión */
-  async getFunnel(environment?: string) {
+  async getFunnel(environment?: string, dateFrom?: string, dateTo?: string) {
     try {
       const envFilter = environment ? { session: { environment } } : {};
       const sessionEnvFilter = environment ? { environment } : {};
+      const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
+      const eventDateFilter = this.buildDateFilter(dateFrom, dateTo);
 
       // Count unique sessions that have each event type
       const [totalSessions, pageViewSessions, addToCartSessions, checkoutSessions, purchaseSessions] = await Promise.all([
-        this.prisma.session.count({ where: sessionEnvFilter }),
+        this.prisma.session.count({ where: { ...sessionEnvFilter, ...sessionDateFilter } }),
         this.prisma.event.groupBy({
           by: ['sessionId'],
-          where: { eventName: 'PageView', ...envFilter },
+          where: { eventName: 'PageView', ...envFilter, ...eventDateFilter },
         }),
         this.prisma.event.groupBy({
           by: ['sessionId'],
-          where: { eventName: 'AddToCart', ...envFilter },
+          where: { eventName: 'AddToCart', ...envFilter, ...eventDateFilter },
         }),
         this.prisma.event.groupBy({
           by: ['sessionId'],
-          where: { eventName: 'InitiateCheckout', ...envFilter },
+          where: { eventName: 'InitiateCheckout', ...envFilter, ...eventDateFilter },
         }),
         this.prisma.event.groupBy({
           by: ['sessionId'],
-          where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] }, ...envFilter },
+          where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] }, ...envFilter, ...eventDateFilter },
         }),
       ]);
 
@@ -290,46 +284,64 @@ export class AnalyticsService {
   }
 
   /** Campaign stats with purchase counts */
-  async getCampaignStats(environment?: string) {
+  async getCampaignStats(environment?: string, dateFrom?: string, dateTo?: string) {
     try {
       const envFilter = environment ? { environment } : {};
+      const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
+      const eventDateFilter = this.buildDateFilter(dateFrom, dateTo);
 
       const campaigns = await this.prisma.session.groupBy({
         by: ['utmSource', 'utmCampaign', 'utmMedium'],
         where: {
           utmSource: { not: null },
           ...envFilter,
+          ...sessionDateFilter,
         },
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
         take: 50,
       });
 
-      // Get purchase counts per campaign combination
-      const campaignsWithPurchases = await Promise.all(
+      // Get purchase counts and unique IPs per campaign combination
+      const campaignsWithDetails = await Promise.all(
         campaigns.map(async (c) => {
-          const purchases = await this.prisma.event.count({
-            where: {
-              eventName: { in: ['Purchase', 'PurchaseConfirm'] },
-              session: {
+          const [purchases, sessions] = await Promise.all([
+            this.prisma.event.count({
+              where: {
+                eventName: { in: ['Purchase', 'PurchaseConfirm'] },
+                ...eventDateFilter,
+                session: {
+                  utmSource: c.utmSource,
+                  utmCampaign: c.utmCampaign,
+                  utmMedium: c.utmMedium,
+                  ...envFilter,
+                },
+              },
+            }),
+            this.prisma.session.findMany({
+              where: {
                 utmSource: c.utmSource,
                 utmCampaign: c.utmCampaign,
                 utmMedium: c.utmMedium,
                 ...envFilter,
+                ...sessionDateFilter,
               },
-            },
-          });
+              select: { visitor: { select: { ip: true } } },
+            }),
+          ]);
+          const uniqueIps = [...new Set(sessions.map((s) => s.visitor.ip).filter(Boolean))];
           return {
             utm_source: c.utmSource,
             utm_campaign: c.utmCampaign,
             utm_medium: c.utmMedium,
             sessions: c._count.id,
             purchases,
+            ips: uniqueIps,
           };
         }),
       );
 
-      return campaignsWithPurchases;
+      return campaignsWithDetails;
     } catch {
       return [];
     }
