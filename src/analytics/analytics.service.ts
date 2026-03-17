@@ -287,69 +287,80 @@ export class AnalyticsService {
     }
   }
 
-  /** Campaign stats with purchase counts — optimized: only 2 DB queries */
+  /** Campaign stats with purchase counts — visitor-level attribution */
   async getCampaignStats(environment?: string, dateFrom?: string, dateTo?: string) {
     try {
       const envFilter = environment ? { environment } : {};
       const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
-      const eventDateFilter = this.buildDateFilter(dateFrom, dateTo);
 
-      // Query 1: All sessions with UTM (lightweight select)
-      // Query 2: All purchase events from UTM sessions (to count per campaign)
-      const [sessions, purchaseEvents] = await Promise.all([
-        this.prisma.session.findMany({
-          where: { utmSource: { not: null }, ...envFilter, ...sessionDateFilter },
-          select: {
-            id: true,
-            utmSource: true,
-            utmCampaign: true,
-            utmMedium: true,
-            visitor: { select: { ip: true } },
-          },
-        }),
-        this.prisma.event.findMany({
-          where: {
-            eventName: { in: ['Purchase', 'PurchaseConfirm'] },
-            ...eventDateFilter,
-            session: { utmSource: { not: null }, ...envFilter },
-          },
-          select: {
-            session: { select: { utmSource: true, utmCampaign: true, utmMedium: true } },
-          },
-        }),
-      ]);
+      // Query 1: All sessions with UTM (include visitorId for cross-session attribution)
+      const sessions = await this.prisma.session.findMany({
+        where: { utmSource: { not: null }, ...envFilter, ...sessionDateFilter },
+        select: {
+          id: true,
+          visitorId: true,
+          utmSource: true,
+          utmCampaign: true,
+          utmMedium: true,
+          visitor: { select: { ip: true } },
+        },
+      });
 
-      // Build purchase count map by utm key
-      const purchaseMap = new Map<string, number>();
-      for (const pe of purchaseEvents) {
-        const key = `${pe.session.utmSource}|${pe.session.utmCampaign || ''}|${pe.session.utmMedium || ''}`;
-        purchaseMap.set(key, (purchaseMap.get(key) || 0) + 1);
-      }
-
-      // Group sessions by utm combo
-      const groupMap = new Map<string, { utmSource: string; utmCampaign: string | null; utmMedium: string | null; count: number; ips: Set<string> }>();
+      // Group sessions by utm combo, also collect visitorIds per campaign
+      const groupMap = new Map<string, { utmSource: string; utmCampaign: string | null; utmMedium: string | null; count: number; ips: Set<string>; visitorIds: Set<string> }>();
       for (const s of sessions) {
         const key = `${s.utmSource}|${s.utmCampaign || ''}|${s.utmMedium || ''}`;
         if (!groupMap.has(key)) {
-          groupMap.set(key, { utmSource: s.utmSource!, utmCampaign: s.utmCampaign, utmMedium: s.utmMedium, count: 0, ips: new Set() });
+          groupMap.set(key, { utmSource: s.utmSource!, utmCampaign: s.utmCampaign, utmMedium: s.utmMedium, count: 0, ips: new Set(), visitorIds: new Set() });
         }
         const g = groupMap.get(key)!;
         g.count++;
         if (s.visitor?.ip) g.ips.add(s.visitor.ip);
+        g.visitorIds.add(s.visitorId);
       }
 
-      // Sort by session count desc, take top 50, attach purchases
+      // Collect ALL unique visitorIds from campaigns
+      const allVisitorIds = new Set<string>();
+      for (const g of groupMap.values()) {
+        for (const vid of g.visitorIds) allVisitorIds.add(vid);
+      }
+
+      // Query 2: All purchase events from campaign visitors (ANY session, not just UTM sessions)
+      const purchaseEvents = allVisitorIds.size > 0
+        ? await this.prisma.event.findMany({
+            where: {
+              eventName: { in: ['Purchase', 'PurchaseConfirm'] },
+              session: { visitorId: { in: [...allVisitorIds] } },
+            },
+            select: { session: { select: { visitorId: true } } },
+          })
+        : [];
+
+      // Count purchases per visitorId
+      const purchasesByVisitor = new Map<string, number>();
+      for (const pe of purchaseEvents) {
+        const vid = pe.session.visitorId;
+        purchasesByVisitor.set(vid, (purchasesByVisitor.get(vid) || 0) + 1);
+      }
+
+      // Sort by session count desc, take top 50, compute purchases per campaign via visitors
       return [...groupMap.entries()]
         .sort((a, b) => b[1].count - a[1].count)
         .slice(0, 50)
-        .map(([key, c]) => ({
-          utm_source: c.utmSource,
-          utm_campaign: c.utmCampaign,
-          utm_medium: c.utmMedium,
-          sessions: c.count,
-          purchases: purchaseMap.get(key) || 0,
-          ips: [...c.ips],
-        }));
+        .map(([, c]) => {
+          let purchases = 0;
+          for (const vid of c.visitorIds) {
+            purchases += purchasesByVisitor.get(vid) || 0;
+          }
+          return {
+            utm_source: c.utmSource,
+            utm_campaign: c.utmCampaign,
+            utm_medium: c.utmMedium,
+            sessions: c.count,
+            purchases,
+            ips: [...c.ips],
+          };
+        });
     } catch {
       return [];
     }
