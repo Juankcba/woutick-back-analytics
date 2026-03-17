@@ -293,7 +293,7 @@ export class AnalyticsService {
       const envFilter = environment ? { environment } : {};
       const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
 
-      // Query 1: All sessions with UTM (include visitorId for cross-session attribution)
+      // Query 1: All sessions with UTM (include visitorId, eventSlug, landingUrl for enrichment)
       const sessions = await this.prisma.session.findMany({
         where: { utmSource: { not: null }, ...envFilter, ...sessionDateFilter },
         select: {
@@ -302,12 +302,17 @@ export class AnalyticsService {
           utmSource: true,
           utmCampaign: true,
           utmMedium: true,
+          utmContent: true,
+          eventSlug: true,
+          landingUrl: true,
           visitor: { select: { ip: true } },
         },
       });
 
-      // Group sessions by utm combo, also collect visitorIds per campaign
+      // Group sessions by utm combo, also collect visitorIds and campaign info per visitor
       const groupMap = new Map<string, { utmSource: string; utmCampaign: string | null; utmMedium: string | null; count: number; ips: Set<string>; visitorIds: Set<string> }>();
+      const visitorCampaignInfo = new Map<string, { utmSource: string; utmCampaign: string | null; utmMedium: string | null; utmContent: string | null; eventSlug: string | null; landingUrl: string | null; ip: string | null }>();
+
       for (const s of sessions) {
         const key = `${s.utmSource}|${s.utmCampaign || ''}|${s.utmMedium || ''}`;
         if (!groupMap.has(key)) {
@@ -317,6 +322,19 @@ export class AnalyticsService {
         g.count++;
         if (s.visitor?.ip) g.ips.add(s.visitor.ip);
         g.visitorIds.add(s.visitorId);
+
+        // Store the first campaign info per visitor (entry session)
+        if (!visitorCampaignInfo.has(s.visitorId)) {
+          visitorCampaignInfo.set(s.visitorId, {
+            utmSource: s.utmSource!,
+            utmCampaign: s.utmCampaign,
+            utmMedium: s.utmMedium,
+            utmContent: s.utmContent,
+            eventSlug: s.eventSlug,
+            landingUrl: s.landingUrl,
+            ip: s.visitor?.ip || null,
+          });
+        }
       }
 
       // Collect ALL unique visitorIds from campaigns
@@ -335,31 +353,28 @@ export class AnalyticsService {
             select: {
               url: true,
               timestamp: true,
-              session: {
-                select: {
-                  visitorId: true,
-                  utmSource: true,
-                  utmCampaign: true,
-                  utmMedium: true,
-                  visitor: { select: { ip: true } },
-                },
-              },
+              session: { select: { visitorId: true } },
             },
           })
         : [];
 
-      // Group purchase details per visitorId
+      // Group purchase details per visitorId, enriched with campaign entry data
       const purchasesByVisitor = new Map<string, any[]>();
       for (const pe of purchaseEvents) {
         const vid = pe.session.visitorId;
+        const campaignInfo = visitorCampaignInfo.get(vid);
         if (!purchasesByVisitor.has(vid)) purchasesByVisitor.set(vid, []);
         purchasesByVisitor.get(vid)!.push({
-          ip: pe.session.visitor?.ip || null,
+          ip: campaignInfo?.ip || null,
           url: pe.url || null,
           timestamp: pe.timestamp,
-          utm_source: pe.session.utmSource,
-          utm_campaign: pe.session.utmCampaign,
-          utm_medium: pe.session.utmMedium,
+          // Campaign entry data (from UTM session, not purchase session)
+          utm_source: campaignInfo?.utmSource || null,
+          utm_campaign: campaignInfo?.utmCampaign || null,
+          utm_medium: campaignInfo?.utmMedium || null,
+          utm_content: campaignInfo?.utmContent || null,
+          event_slug: campaignInfo?.eventSlug || null,
+          landing_url: campaignInfo?.landingUrl || null,
         });
       }
 
