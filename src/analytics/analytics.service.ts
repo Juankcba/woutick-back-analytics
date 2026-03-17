@@ -290,53 +290,58 @@ export class AnalyticsService {
       const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
       const eventDateFilter = this.buildDateFilter(dateFrom, dateTo);
 
-      const campaigns = await this.prisma.session.groupBy({
-        by: ['utmSource', 'utmCampaign', 'utmMedium'],
+      // Use findMany instead of groupBy (Prisma groupBy is unreliable with MongoDB optional fields)
+      const sessions = await this.prisma.session.findMany({
         where: {
           utmSource: { not: null },
           ...envFilter,
           ...sessionDateFilter,
         },
-        _count: { id: true },
-        orderBy: { _count: { id: 'desc' } },
-        take: 50,
+        select: {
+          utmSource: true,
+          utmCampaign: true,
+          utmMedium: true,
+          visitor: { select: { ip: true } },
+        },
       });
 
-      // Get purchase counts and unique IPs per campaign combination
+      // Manual grouping by utm combo
+      const groupMap = new Map<string, { utmSource: string; utmCampaign: string | null; utmMedium: string | null; count: number; ips: Set<string> }>();
+      for (const s of sessions) {
+        const key = `${s.utmSource}|${s.utmCampaign || ''}|${s.utmMedium || ''}`;
+        if (!groupMap.has(key)) {
+          groupMap.set(key, { utmSource: s.utmSource!, utmCampaign: s.utmCampaign, utmMedium: s.utmMedium, count: 0, ips: new Set() });
+        }
+        const g = groupMap.get(key)!;
+        g.count++;
+        if (s.visitor?.ip) g.ips.add(s.visitor.ip);
+      }
+
+      // Sort by session count desc, take top 50
+      const grouped = [...groupMap.values()].sort((a, b) => b.count - a.count).slice(0, 50);
+
+      // Get purchase counts per campaign combination
       const campaignsWithDetails = await Promise.all(
-        campaigns.map(async (c) => {
-          const [purchases, sessions] = await Promise.all([
-            this.prisma.event.count({
-              where: {
-                eventName: { in: ['Purchase', 'PurchaseConfirm'] },
-                ...eventDateFilter,
-                session: {
-                  utmSource: c.utmSource,
-                  utmCampaign: c.utmCampaign,
-                  utmMedium: c.utmMedium,
-                  ...envFilter,
-                },
-              },
-            }),
-            this.prisma.session.findMany({
-              where: {
+        grouped.map(async (c) => {
+          const purchases = await this.prisma.event.count({
+            where: {
+              eventName: { in: ['Purchase', 'PurchaseConfirm'] },
+              ...eventDateFilter,
+              session: {
                 utmSource: c.utmSource,
                 utmCampaign: c.utmCampaign,
                 utmMedium: c.utmMedium,
                 ...envFilter,
-                ...sessionDateFilter,
               },
-              select: { visitor: { select: { ip: true } } },
-            }),
-          ]);
-          const uniqueIps = [...new Set(sessions.map((s) => s.visitor.ip).filter(Boolean))];
+            },
+          });
           return {
             utm_source: c.utmSource,
             utm_campaign: c.utmCampaign,
             utm_medium: c.utmMedium,
-            sessions: c._count.id,
+            sessions: c.count,
             purchases,
-            ips: uniqueIps,
+            ips: [...c.ips],
           };
         }),
       );
