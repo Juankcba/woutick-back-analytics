@@ -23,6 +23,7 @@ model Visitor {
   lastSeen       DateTime @updatedAt @map("last_seen")
   sessions       Session[]
 
+  @@index([lastSeen])
   @@map("visitors")
 }
 
@@ -47,6 +48,10 @@ model Session {
   requestLogs   RequestLog[]
   metaLogs      MetaLog[]
 
+  @@index([environment, startedAt])
+  @@index([utmSource, environment])
+  @@index([visitorId])
+  @@index([startedAt])
   @@map("sessions")
 }
 
@@ -61,6 +66,9 @@ model Event {
   timestamp  DateTime @default(now())
   customData Json?    @map("custom_data")
 
+  @@index([eventName, sessionId])
+  @@index([eventName, timestamp])
+  @@index([sessionId, timestamp])
   @@map("events")
 }
 
@@ -101,6 +109,8 @@ model MetaLog {
   cookieConsent    Boolean? @map("cookie_consent")
   timestamp        DateTime @default(now())
 
+  @@index([timestamp])
+  @@index([eventName, timestamp])
   @@map("meta_logs")
 }
 
