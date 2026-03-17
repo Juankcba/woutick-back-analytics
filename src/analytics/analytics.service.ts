@@ -217,7 +217,7 @@ export class AnalyticsService {
         this.prisma.session.count({ where: sessionDateFilter }),
         this.prisma.event.count({ where: eventDateFilter }),
         this.prisma.metaLog.count({ where: eventDateFilter }),
-        this.prisma.event.count({ where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] }, ...eventDateFilter } }),
+        this.prisma.event.count({ where: { eventName: 'PurchaseConfirm', ...eventDateFilter } }),
       ]);
 
       return {
@@ -329,7 +329,7 @@ export class AnalyticsService {
       const purchaseEvents = allVisitorIds.size > 0
         ? await this.prisma.event.findMany({
             where: {
-              eventName: { in: ['Purchase', 'PurchaseConfirm'] },
+              eventName: 'PurchaseConfirm',
               session: { visitorId: { in: [...allVisitorIds] } },
             },
             select: { session: { select: { visitorId: true } } },
