@@ -251,7 +251,7 @@ export class AnalyticsService {
         this.prisma.session.count({ where: { ...sessionEnvFilter, ...sessionDateFilter } }),
         this.prisma.event.findMany({
           where: {
-            eventName: { in: ['PageView', 'AddToCart', 'InitiateCheckout', 'Purchase', 'PurchaseConfirm'] },
+            eventName: { in: ['PageView', 'AddToCart', 'InitiateCheckout', 'begin_checkout', 'Purchase', 'PurchaseConfirm'] },
             ...envFilter,
             ...eventDateFilter,
           },
@@ -267,7 +267,9 @@ export class AnalyticsService {
         Purchase: new Set(),
       };
       for (const e of events) {
-        const step = e.eventName === 'PurchaseConfirm' ? 'Purchase' : e.eventName;
+        let step = e.eventName;
+        if (step === 'PurchaseConfirm') step = 'Purchase';
+        if (step === 'begin_checkout') step = 'InitiateCheckout';
         sessionSets[step]?.add(e.sessionId);
       }
 
