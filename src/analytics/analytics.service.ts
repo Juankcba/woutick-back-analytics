@@ -188,6 +188,7 @@ export class AnalyticsService {
         totalSessions,
         totalEvents,
         totalMetaLogs,
+        totalPurchases,
         consentYes,
         consentNo,
         sessionConsentYes,
@@ -198,6 +199,7 @@ export class AnalyticsService {
         this.prisma.session.count(),
         this.prisma.event.count(),
         this.prisma.metaLog.count(),
+        this.prisma.event.count({ where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] } } }),
         this.prisma.visitor.count({ where: { cookieConsent: true } }),
         this.prisma.visitor.count({ where: { cookieConsent: false } }),
         this.prisma.session.count({ where: { cookieConsent: true } }),
@@ -211,6 +213,7 @@ export class AnalyticsService {
           sessions: totalSessions,
           events: totalEvents,
           meta_logs: totalMetaLogs,
+          purchases: totalPurchases,
         },
         cookie_consent: {
           visitors: {
@@ -234,7 +237,7 @@ export class AnalyticsService {
     } catch {
       return {
         online: { online_count: 0, online_ips: [] },
-        totals: { visitors: 0, sessions: 0, events: 0, meta_logs: 0 },
+        totals: { visitors: 0, sessions: 0, events: 0, meta_logs: 0, purchases: 0 },
         cookie_consent: {
           visitors: { total: 0, accepted: 0, rejected: 0, unknown: 0, accepted_pct: 0, rejected_pct: 0 },
           sessions: { total: 0, accepted: 0, rejected: 0, unknown: 0, accepted_pct: 0, rejected_pct: 0 },
@@ -286,7 +289,7 @@ export class AnalyticsService {
     }
   }
 
-  /** Campaign stats */
+  /** Campaign stats with purchase counts */
   async getCampaignStats(environment?: string) {
     try {
       const envFilter = environment ? { environment } : {};
@@ -302,12 +305,31 @@ export class AnalyticsService {
         take: 50,
       });
 
-      return campaigns.map((c) => ({
-        utm_source: c.utmSource,
-        utm_campaign: c.utmCampaign,
-        utm_medium: c.utmMedium,
-        sessions: c._count.id,
-      }));
+      // Get purchase counts per campaign combination
+      const campaignsWithPurchases = await Promise.all(
+        campaigns.map(async (c) => {
+          const purchases = await this.prisma.event.count({
+            where: {
+              eventName: { in: ['Purchase', 'PurchaseConfirm'] },
+              session: {
+                utmSource: c.utmSource,
+                utmCampaign: c.utmCampaign,
+                utmMedium: c.utmMedium,
+                ...envFilter,
+              },
+            },
+          });
+          return {
+            utm_source: c.utmSource,
+            utm_campaign: c.utmCampaign,
+            utm_medium: c.utmMedium,
+            sessions: c._count.id,
+            purchases,
+          };
+        }),
+      );
+
+      return campaignsWithPurchases;
     } catch {
       return [];
     }
