@@ -26,14 +26,12 @@ export class AnalyticsController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
-    const [dashboard, funnel, campaigns, visitors, metaLogs] = await Promise.all([
+    const [dashboard, funnel, campaigns] = await Promise.all([
       this.analyticsService.getDashboardStats(dateFrom, dateTo),
       this.analyticsService.getFunnel(environment, dateFrom, dateTo),
       this.analyticsService.getCampaignStats(environment, dateFrom, dateTo),
-      this.analyticsService.getVisitors(1, 20, dateFrom, dateTo),
-      this.analyticsService.getMetaLogs({ page: 1, limit: 20, dateFrom, dateTo }),
     ]);
-    return { dashboard, funnel, campaigns, visitors, metaLogs };
+    return { dashboard, funnel, campaigns };
   }
 
   @Get('online')
@@ -98,19 +96,28 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Logs de Meta CAPI con filtros' })
   @ApiQuery({ name: 'event_name', required: false, example: 'Purchase' })
   @ApiQuery({ name: 'has_adblock', required: false, enum: ['true', 'false'] })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by email, IP or event name' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'dateFrom', required: false, example: '2026-03-01' })
+  @ApiQuery({ name: 'dateTo', required: false, example: '2026-03-19' })
   async getMetaLogs(
     @Query('event_name') eventName?: string,
     @Query('has_adblock') hasAdblock?: string,
+    @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
   ) {
     return this.analyticsService.getMetaLogs({
       event_name: eventName,
       has_adblock: hasAdblock === 'true' ? true : hasAdblock === 'false' ? false : undefined,
+      search,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 50,
+      dateFrom,
+      dateTo,
     });
   }
 

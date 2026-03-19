@@ -129,6 +129,7 @@ export class AnalyticsService {
   async getMetaLogs(filters?: {
     event_name?: string;
     has_adblock?: boolean;
+    search?: string;
     page?: number;
     limit?: number;
     dateFrom?: string;
@@ -143,6 +144,17 @@ export class AnalyticsService {
       const where: any = { ...dateFilter };
       if (filters?.event_name) where.eventName = filters.event_name;
       if (filters?.has_adblock !== undefined) where.hasAdblock = filters.has_adblock;
+
+      // Text search: search across clientIp, eventName, and requestPayload (for email)
+      if (filters?.search) {
+        const searchTerm = filters.search.trim();
+        where.OR = [
+          { clientIp: { contains: searchTerm, mode: 'insensitive' } },
+          { eventName: { contains: searchTerm, mode: 'insensitive' } },
+          // Search inside requestPayload JSON for email (MongoDB string_contains on Json fields)
+          { requestPayload: { string_contains: searchTerm } },
+        ];
+      }
 
       const [logs, total] = await Promise.all([
         this.prisma.metaLog.findMany({
