@@ -250,7 +250,7 @@ export class AnalyticsService {
     }
   }
 
-  /** Funnel de conversión — optimized: 2 DB queries instead of 5 */
+  /** Funnel de conversión — optimized with groupBy */
   async getFunnel(environment?: string, dateFrom?: string, dateTo?: string) {
     try {
       const sessionEnvFilter = environment ? { environment } : {};
@@ -258,42 +258,42 @@ export class AnalyticsService {
       const eventDateFilter = this.buildDateFilter(dateFrom, dateTo);
       const envFilter = environment ? { session: { environment } } : {};
 
-      // 2 queries: total sessions + all funnel-relevant events
-      const [totalSessions, events] = await Promise.all([
+      // Count total sessions + count distinct sessions per funnel event using groupBy
+      const [totalSessions, funnelCounts] = await Promise.all([
         this.prisma.session.count({ where: { ...sessionEnvFilter, ...sessionDateFilter } }),
-        this.prisma.event.findMany({
-          where: {
-            eventName: { in: ['PageView', 'AddToCart', 'InitiateCheckout', 'begin_checkout', 'Purchase', 'PurchaseConfirm'] },
-            ...envFilter,
-            ...eventDateFilter,
-          },
-          select: { eventName: true, sessionId: true },
-        }),
+        // Use groupBy on eventName to count events per type, then we'll count distinct sessions
+        // Since Prisma groupBy doesn't support countDistinct on relations easily,
+        // we use separate count queries for each funnel step (still 4 queries but each is a simple count)
+        Promise.all([
+          this.prisma.event.groupBy({
+            by: ['sessionId'],
+            where: { eventName: 'PageView', ...envFilter, ...eventDateFilter },
+          }).then(r => r.length),
+          this.prisma.event.groupBy({
+            by: ['sessionId'],
+            where: { eventName: 'AddToCart', ...envFilter, ...eventDateFilter },
+          }).then(r => r.length),
+          this.prisma.event.groupBy({
+            by: ['sessionId'],
+            where: { eventName: { in: ['InitiateCheckout', 'begin_checkout'] }, ...envFilter, ...eventDateFilter },
+          }).then(r => r.length),
+          this.prisma.event.groupBy({
+            by: ['sessionId'],
+            where: { eventName: { in: ['Purchase', 'PurchaseConfirm'] }, ...envFilter, ...eventDateFilter },
+          }).then(r => r.length),
+        ]),
       ]);
 
-      // Count unique sessions per event type
-      const sessionSets: Record<string, Set<string>> = {
-        PageView: new Set(),
-        AddToCart: new Set(),
-        InitiateCheckout: new Set(),
-        Purchase: new Set(),
-      };
-      for (const e of events) {
-        let step = e.eventName;
-        if (step === 'PurchaseConfirm') step = 'Purchase';
-        if (step === 'begin_checkout') step = 'InitiateCheckout';
-        sessionSets[step]?.add(e.sessionId);
-      }
-
+      const [pageView, addToCart, initiateCheckout, purchase] = funnelCounts;
       const pct = (count: number) => totalSessions > 0 ? Math.round((count / totalSessions) * 1000) / 10 : 0;
 
       return {
         total_sessions: totalSessions,
         funnel: [
-          { step: 'PageView', sessions: sessionSets.PageView.size, percentage: pct(sessionSets.PageView.size) },
-          { step: 'AddToCart', sessions: sessionSets.AddToCart.size, percentage: pct(sessionSets.AddToCart.size) },
-          { step: 'InitiateCheckout', sessions: sessionSets.InitiateCheckout.size, percentage: pct(sessionSets.InitiateCheckout.size) },
-          { step: 'Purchase', sessions: sessionSets.Purchase.size, percentage: pct(sessionSets.Purchase.size) },
+          { step: 'PageView', sessions: pageView, percentage: pct(pageView) },
+          { step: 'AddToCart', sessions: addToCart, percentage: pct(addToCart) },
+          { step: 'InitiateCheckout', sessions: initiateCheckout, percentage: pct(initiateCheckout) },
+          { step: 'Purchase', sessions: purchase, percentage: pct(purchase) },
         ],
       };
     } catch {
@@ -301,17 +301,44 @@ export class AnalyticsService {
     }
   }
 
-  /** Campaign stats with purchase counts — visitor-level attribution */
+  /** Campaign stats with purchase counts — optimized with groupBy */
   async getCampaignStats(environment?: string, dateFrom?: string, dateTo?: string) {
     try {
       const envFilter = environment ? { environment } : {};
       const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
 
-      // Query 1: All sessions with UTM (include visitorId, eventSlug, landingUrl for enrichment)
-      const sessions = await this.prisma.session.findMany({
+      // Step 1: Use groupBy to count sessions per UTM combo at DB level (no full data load)
+      const sessionGroups = await this.prisma.session.groupBy({
+        by: ['utmSource', 'utmCampaign', 'utmMedium', 'utmContent'],
         where: { utmSource: { not: null }, ...envFilter, ...sessionDateFilter },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+        take: 50,
+      });
+
+      if (sessionGroups.length === 0) return [];
+
+      // Step 2: For each top campaign, get visitorIds and IPs (only for top 50 campaigns)
+      const campaignFilters = sessionGroups.map(g => ({
+        utmSource: g.utmSource,
+        utmCampaign: g.utmCampaign,
+        utmMedium: g.utmMedium,
+        utmContent: g.utmContent,
+      }));
+
+      // Get all visitor IPs and IDs for top campaigns in one query
+      const sessionsForCampaigns = await this.prisma.session.findMany({
+        where: {
+          OR: campaignFilters.map(f => ({
+            utmSource: f.utmSource,
+            utmCampaign: f.utmCampaign,
+            utmMedium: f.utmMedium,
+            utmContent: f.utmContent,
+            ...envFilter,
+            ...sessionDateFilter,
+          })),
+        },
         select: {
-          id: true,
           visitorId: true,
           utmSource: true,
           utmCampaign: true,
@@ -323,24 +350,24 @@ export class AnalyticsService {
         },
       });
 
-      // Group sessions by utm combo, also collect visitorIds and campaign info per visitor
-      const groupMap = new Map<string, { utmSource: string; utmCampaign: string | null; utmMedium: string | null; count: number; ips: Set<string>; visitorIds: Set<string> }>();
-      const visitorCampaignInfo = new Map<string, { utmSource: string; utmCampaign: string | null; utmMedium: string | null; utmContent: string | null; eventSlug: string | null; landingUrl: string | null; ip: string | null }>();
+      // Build lookup maps per campaign key
+      const campaignData = new Map<string, {
+        ips: Set<string>;
+        visitorIds: Set<string>;
+        visitorInfo: Map<string, any>;
+      }>();
 
-      for (const s of sessions) {
-        const key = `${s.utmSource}|${s.utmCampaign || ''}|${s.utmMedium || ''}`;
-        if (!groupMap.has(key)) {
-          groupMap.set(key, { utmSource: s.utmSource!, utmCampaign: s.utmCampaign, utmMedium: s.utmMedium, count: 0, ips: new Set(), visitorIds: new Set() });
+      for (const s of sessionsForCampaigns) {
+        const key = `${s.utmSource}|${s.utmCampaign || ''}|${s.utmMedium || ''}|${s.utmContent || ''}`;
+        if (!campaignData.has(key)) {
+          campaignData.set(key, { ips: new Set(), visitorIds: new Set(), visitorInfo: new Map() });
         }
-        const g = groupMap.get(key)!;
-        g.count++;
-        if (s.visitor?.ip) g.ips.add(s.visitor.ip);
-        g.visitorIds.add(s.visitorId);
-
-        // Store the first campaign info per visitor (entry session)
-        if (!visitorCampaignInfo.has(s.visitorId)) {
-          visitorCampaignInfo.set(s.visitorId, {
-            utmSource: s.utmSource!,
+        const data = campaignData.get(key)!;
+        if (s.visitor?.ip) data.ips.add(s.visitor.ip);
+        data.visitorIds.add(s.visitorId);
+        if (!data.visitorInfo.has(s.visitorId)) {
+          data.visitorInfo.set(s.visitorId, {
+            utmSource: s.utmSource,
             utmCampaign: s.utmCampaign,
             utmMedium: s.utmMedium,
             utmContent: s.utmContent,
@@ -351,13 +378,12 @@ export class AnalyticsService {
         }
       }
 
-      // Collect ALL unique visitorIds from campaigns
+      // Step 3: Get purchase events for all campaign visitors in ONE query
       const allVisitorIds = new Set<string>();
-      for (const g of groupMap.values()) {
-        for (const vid of g.visitorIds) allVisitorIds.add(vid);
+      for (const d of campaignData.values()) {
+        for (const vid of d.visitorIds) allVisitorIds.add(vid);
       }
 
-      // Query 2: All PurchaseConfirm events from campaign visitors with details
       const purchaseEvents = allVisitorIds.size > 0
         ? await this.prisma.event.findMany({
             where: {
@@ -372,46 +398,53 @@ export class AnalyticsService {
           })
         : [];
 
-      // Group purchase details per visitorId, enriched with campaign entry data
+      // Group purchases by visitor
       const purchasesByVisitor = new Map<string, any[]>();
       for (const pe of purchaseEvents) {
         const vid = pe.session.visitorId;
-        const campaignInfo = visitorCampaignInfo.get(vid);
         if (!purchasesByVisitor.has(vid)) purchasesByVisitor.set(vid, []);
-        purchasesByVisitor.get(vid)!.push({
-          ip: campaignInfo?.ip || null,
-          url: pe.url || null,
-          timestamp: pe.timestamp,
-          // Campaign entry data (from UTM session, not purchase session)
-          utm_source: campaignInfo?.utmSource || null,
-          utm_campaign: campaignInfo?.utmCampaign || null,
-          utm_medium: campaignInfo?.utmMedium || null,
-          utm_content: campaignInfo?.utmContent || null,
-          event_slug: campaignInfo?.eventSlug || null,
-          landing_url: campaignInfo?.landingUrl || null,
-        });
+        purchasesByVisitor.get(vid)!.push({ url: pe.url, timestamp: pe.timestamp });
       }
 
-      // Sort by session count desc, take top 50, compute purchases per campaign via visitors
-      return [...groupMap.entries()]
-        .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, 50)
-        .map(([, c]) => {
-          const purchaseDetails: any[] = [];
-          for (const vid of c.visitorIds) {
-            const details = purchasesByVisitor.get(vid);
-            if (details) purchaseDetails.push(...details);
+      // Step 4: Assemble results
+      return sessionGroups.map(g => {
+        const key = `${g.utmSource}|${g.utmCampaign || ''}|${g.utmMedium || ''}|${g.utmContent || ''}`;
+        const data = campaignData.get(key);
+        const purchaseDetails: any[] = [];
+
+        if (data) {
+          for (const vid of data.visitorIds) {
+            const purchases = purchasesByVisitor.get(vid);
+            if (purchases) {
+              const info = data.visitorInfo.get(vid);
+              for (const p of purchases) {
+                purchaseDetails.push({
+                  ip: info?.ip || null,
+                  url: p.url,
+                  timestamp: p.timestamp,
+                  utm_source: info?.utmSource,
+                  utm_campaign: info?.utmCampaign,
+                  utm_medium: info?.utmMedium,
+                  utm_content: info?.utmContent,
+                  event_slug: info?.eventSlug,
+                  landing_url: info?.landingUrl,
+                });
+              }
+            }
           }
-          return {
-            utm_source: c.utmSource,
-            utm_campaign: c.utmCampaign,
-            utm_medium: c.utmMedium,
-            sessions: c.count,
-            purchases: purchaseDetails.length,
-            purchaseDetails,
-            ips: [...c.ips],
-          };
-        });
+        }
+
+        return {
+          utm_source: g.utmSource,
+          utm_campaign: g.utmCampaign,
+          utm_medium: g.utmMedium,
+          utm_content: g.utmContent,
+          sessions: g._count.id,
+          purchases: purchaseDetails.length,
+          purchaseDetails,
+          ips: data ? [...data.ips] : [],
+        };
+      });
     } catch {
       return [];
     }
