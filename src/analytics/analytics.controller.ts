@@ -91,6 +91,29 @@ export class AnalyticsController {
     return this.analyticsService.getRequestLogsBySession(sessionId);
   }
 
+  @Get('purchases')
+  @ApiOperation({ summary: 'PurchaseConfirm events with session/visitor details' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by URL, IP or order UUID' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'dateFrom', required: false })
+  @ApiQuery({ name: 'dateTo', required: false })
+  async getPurchases(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.analyticsService.getPurchaseEvents({
+      search,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 50,
+      dateFrom,
+      dateTo,
+    });
+  }
+
   @Get('meta-logs')
   @ApiOperation({ summary: 'Logs de Meta CAPI con filtros' })
   @ApiQuery({ name: 'event_name', required: false, example: 'Purchase' })

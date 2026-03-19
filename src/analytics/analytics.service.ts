@@ -301,6 +301,80 @@ export class AnalyticsService {
     }
   }
 
+  /** List PurchaseConfirm events with session/visitor details */
+  async getPurchaseEvents(opts: { search?: string; page: number; limit: number; dateFrom?: string; dateTo?: string }) {
+    try {
+      const { search, page, limit, dateFrom, dateTo } = opts;
+      const dateFilter = this.buildDateFilter(dateFrom, dateTo);
+
+      const where: any = { eventName: 'PurchaseConfirm', ...dateFilter };
+
+      // Search across url, visitor IP
+      if (search?.trim()) {
+        const s = search.trim();
+        where.OR = [
+          { url: { contains: s, mode: 'insensitive' } },
+          { session: { visitor: { ip: { contains: s, mode: 'insensitive' } } } },
+        ];
+      }
+
+      const [total, events] = await Promise.all([
+        this.prisma.event.count({ where }),
+        this.prisma.event.findMany({
+          where,
+          select: {
+            id: true,
+            url: true,
+            timestamp: true,
+            customData: true,
+            session: {
+              select: {
+                utmSource: true,
+                utmCampaign: true,
+                utmMedium: true,
+                utmContent: true,
+                eventSlug: true,
+                landingUrl: true,
+                environment: true,
+                visitor: { select: { ip: true } },
+              },
+            },
+          },
+          orderBy: { timestamp: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      ]);
+
+      const purchases = events.map(e => {
+        // Extract order UUID from URL (e.g. /order/UUID/confirm)
+        const orderMatch = e.url?.match(/\/order\/([a-f0-9-]+)/i);
+        const customData = (e.customData as any) || {};
+        return {
+          id: e.id,
+          timestamp: e.timestamp,
+          url: e.url,
+          orderUuid: orderMatch?.[1] || null,
+          value: customData.value || null,
+          currency: customData.currency || null,
+          numItems: customData.num_items || null,
+          ip: e.session?.visitor?.ip || null,
+          utm_source: e.session?.utmSource || null,
+          utm_campaign: e.session?.utmCampaign || null,
+          utm_medium: e.session?.utmMedium || null,
+          utm_content: e.session?.utmContent || null,
+          event_slug: e.session?.eventSlug || null,
+          environment: e.session?.environment || null,
+        };
+      });
+
+      return { total, page, limit, purchases };
+    } catch (e) {
+      console.error('getPurchaseEvents error:', e);
+      return { total: 0, page: 1, limit: 50, purchases: [] };
+    }
+  }
+
   /** Campaign stats with purchase counts — visitor-level attribution */
   async getCampaignStats(environment?: string, dateFrom?: string, dateTo?: string) {
     try {
