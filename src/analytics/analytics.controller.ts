@@ -26,12 +26,11 @@ export class AnalyticsController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
-    const [dashboard, funnel, campaigns] = await Promise.all([
+    const [dashboard, campaigns] = await Promise.all([
       this.analyticsService.getDashboardStats(dateFrom, dateTo),
-      this.analyticsService.getFunnel(environment, dateFrom, dateTo),
       this.analyticsService.getCampaignStats(environment, dateFrom, dateTo),
     ]);
-    return { dashboard, funnel, campaigns };
+    return { dashboard, campaigns };
   }
 
   @Get('online')
