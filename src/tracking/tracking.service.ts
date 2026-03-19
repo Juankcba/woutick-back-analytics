@@ -98,10 +98,21 @@ export class TrackingService {
         },
       });
     } else {
-      // Update last activity
+      // Update last activity + backfill UTM if session was created without it
+      const updateData: any = { lastActivity: new Date() };
+      if (!session.utmSource && options?.utmSource) {
+        updateData.utmSource = options.utmSource;
+        updateData.utmMedium = options.utmMedium;
+        updateData.utmCampaign = options.utmCampaign;
+        updateData.utmContent = options.utmContent;
+        updateData.fbclid = options.fbclid;
+        updateData.referer = options.referer;
+        if (options.eventSlug) updateData.eventSlug = options.eventSlug;
+        if (options.landingUrl) updateData.landingUrl = options.landingUrl;
+      }
       await this.prisma.session.update({
         where: { id: session.id },
-        data: { lastActivity: new Date() },
+        data: updateData,
       });
     }
 
