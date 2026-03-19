@@ -561,4 +561,93 @@ export class AnalyticsService {
       return null;
     }
   }
+
+  /** Extract campaign URLs from PageView/ViewContent CAPI logs */
+  async getCampaignUrlsFromLogs(dateFrom?: string, dateTo?: string) {
+    try {
+      const dateFilter = this.buildDateFilter(dateFrom, dateTo);
+      const logs = await this.prisma.metaLog.findMany({
+        where: {
+          eventName: { in: ['PageView', 'ViewContent'] },
+          ...dateFilter,
+        },
+        select: {
+          eventName: true,
+          clientIp: true,
+          timestamp: true,
+          requestPayload: true,
+        },
+        orderBy: { timestamp: 'desc' },
+      });
+
+      const results: any[] = [];
+      for (const log of logs) {
+        const payload = log.requestPayload as any;
+        const eventData = payload?.data?.[0];
+        const sourceUrl = eventData?.event_source_url;
+        if (!sourceUrl) continue;
+
+        try {
+          const url = new URL(sourceUrl);
+          const params = url.searchParams;
+          // Check for any UTM or campaign-related param
+          const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_id', 'utm_term', 'fbclid'];
+          const hasUtm = utmKeys.some(k => params.has(k));
+          if (!hasUtm) continue;
+
+          results.push({
+            eventName: log.eventName,
+            url: sourceUrl,
+            path: url.pathname,
+            utm_source: params.get('utm_source'),
+            utm_medium: params.get('utm_medium'),
+            utm_campaign: params.get('utm_campaign'),
+            utm_content: params.get('utm_content'),
+            utm_id: params.get('utm_id'),
+            fbclid: params.has('fbclid'),
+            ip: log.clientIp,
+            timestamp: log.timestamp,
+          });
+        } catch { /* invalid URL */ }
+      }
+
+      // Group by utm combo
+      const groupMap = new Map<string, {
+        utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; utm_content: string | null;
+        count: number; ips: Set<string>; paths: Set<string>; entries: any[];
+      }>();
+
+      for (const r of results) {
+        const key = `${r.utm_source || ''}|${r.utm_campaign || ''}|${r.utm_medium || ''}|${r.utm_content || ''}`;
+        if (!groupMap.has(key)) {
+          groupMap.set(key, {
+            utm_source: r.utm_source, utm_medium: r.utm_medium,
+            utm_campaign: r.utm_campaign, utm_content: r.utm_content,
+            count: 0, ips: new Set(), paths: new Set(), entries: [],
+          });
+        }
+        const g = groupMap.get(key)!;
+        g.count++;
+        if (r.ip) g.ips.add(r.ip);
+        g.paths.add(r.path);
+        g.entries.push({ eventName: r.eventName, ip: r.ip, path: r.path, timestamp: r.timestamp, fbclid: r.fbclid });
+      }
+
+      const grouped = [...groupMap.values()]
+        .sort((a, b) => b.count - a.count)
+        .map(g => ({
+          utm_source: g.utm_source, utm_medium: g.utm_medium,
+          utm_campaign: g.utm_campaign, utm_content: g.utm_content,
+          count: g.count, uniqueIps: g.ips.size,
+          paths: [...g.paths],
+          entries: g.entries.slice(0, 50), // limit entries per group
+          ips: [...g.ips],
+        }));
+
+      return { total: results.length, groups: grouped };
+    } catch (e) {
+      console.error('getCampaignUrlsFromLogs error:', e);
+      return { total: 0, groups: [] };
+    }
+  }
 }
