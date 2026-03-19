@@ -562,8 +562,8 @@ export class AnalyticsService {
     }
   }
 
-  /** Extract campaign URLs from PageView/ViewContent CAPI logs */
-  async getCampaignUrlsFromLogs(dateFrom?: string, dateTo?: string) {
+  /** Generate campaign URLs report from CAPI logs and save to DB */
+  async generateCampaignReport(dateFrom?: string, dateTo?: string) {
     try {
       const dateFilter = this.buildDateFilter(dateFrom, dateTo);
       const logs = await this.prisma.metaLog.findMany({
@@ -590,7 +590,6 @@ export class AnalyticsService {
         try {
           const url = new URL(sourceUrl);
           const params = url.searchParams;
-          // Check for any UTM or campaign-related param
           const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_id', 'utm_term', 'fbclid'];
           const hasUtm = utmKeys.some(k => params.has(k));
           if (!hasUtm) continue;
@@ -640,14 +639,38 @@ export class AnalyticsService {
           utm_campaign: g.utm_campaign, utm_content: g.utm_content,
           count: g.count, uniqueIps: g.ips.size,
           paths: [...g.paths],
-          entries: g.entries.slice(0, 50), // limit entries per group
+          entries: g.entries.slice(0, 100),
           ips: [...g.ips],
         }));
 
-      return { total: results.length, groups: grouped };
+      // Save to DB
+      const report = await this.prisma.campaignReport.create({
+        data: {
+          name: `Reporte ${new Date().toLocaleDateString('es-ES')}`,
+          dateFrom: dateFrom || null,
+          dateTo: dateTo || null,
+          total: results.length,
+          data: { groups: grouped },
+        },
+      });
+
+      return { uuid: report.uuid, total: results.length, groupCount: grouped.length };
     } catch (e) {
-      console.error('getCampaignUrlsFromLogs error:', e);
-      return { total: 0, groups: [] };
+      console.error('generateCampaignReport error:', e);
+      return { error: 'Failed to generate report' };
+    }
+  }
+
+  /** Get a saved campaign report by UUID */
+  async getCampaignReport(uuid: string) {
+    try {
+      const report = await this.prisma.campaignReport.findUnique({
+        where: { uuid },
+      });
+      if (!report) return null;
+      return report;
+    } catch {
+      return null;
     }
   }
 }

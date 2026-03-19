@@ -121,3 +121,17 @@ model AppConfig {
 
   @@map("app_config")
 }
+
+model CampaignReport {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  uuid      String   @unique @default(uuid())
+  name      String?
+  dateFrom  String?  @map("date_from")
+  dateTo    String?  @map("date_to")
+  total     Int      @default(0)
+  data      Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("campaign_reports")
+}

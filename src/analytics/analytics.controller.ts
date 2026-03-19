@@ -115,14 +115,20 @@ export class AnalyticsController {
   }
 
   @Get('campaign-urls')
-  @ApiOperation({ summary: 'Extract campaign URLs from PageView/ViewContent CAPI logs' })
+  @ApiOperation({ summary: 'Generate and save campaign URLs report from CAPI logs' })
   @ApiQuery({ name: 'dateFrom', required: false })
   @ApiQuery({ name: 'dateTo', required: false })
   async getCampaignUrls(
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
-    return this.analyticsService.getCampaignUrlsFromLogs(dateFrom, dateTo);
+    return this.analyticsService.generateCampaignReport(dateFrom, dateTo);
+  }
+
+  @Get('campaign-report/:uuid')
+  @ApiOperation({ summary: 'Get a saved campaign report by UUID' })
+  async getCampaignReport(@Param('uuid') uuid: string) {
+    return this.analyticsService.getCampaignReport(uuid);
   }
 
   @Get('meta-logs')
