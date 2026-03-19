@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { TokenGuard } from '../auth/token.guard';
 import { AnalyticsService } from './analytics.service';
@@ -185,5 +185,11 @@ export class AnalyticsController {
   @ApiQuery({ name: 'ip', required: true, example: '185.140.33.38' })
   async searchByIp(@Query('ip') ip: string) {
     return this.analyticsService.searchByIp(ip);
+  }
+
+  @Post('batch-purchases')
+  @ApiOperation({ summary: 'Find Purchase/PurchaseConfirm events for a list of IPs' })
+  async batchPurchases(@Body() body: { ips: string[] }) {
+    return this.analyticsService.batchPurchasesByIps(body.ips || []);
   }
 }

@@ -673,4 +673,67 @@ export class AnalyticsService {
       return null;
     }
   }
+
+  /** Find Purchase/PurchaseConfirm events for a batch of IPs */
+  async batchPurchasesByIps(ips: string[]) {
+    try {
+      if (!ips.length) return { purchases: [] };
+
+      // 1. Find visitors matching these IPs
+      const visitors = await this.prisma.visitor.findMany({
+        where: { ip: { in: ips } },
+        select: { id: true, ip: true },
+      });
+      if (!visitors.length) return { purchases: [] };
+
+      const visitorMap = new Map(visitors.map(v => [v.id, v.ip]));
+      const visitorIds = visitors.map(v => v.id);
+
+      // 2. Find sessions for these visitors
+      const sessions = await this.prisma.session.findMany({
+        where: { visitorId: { in: visitorIds } },
+        select: {
+          id: true, visitorId: true,
+          utmSource: true, utmMedium: true, utmCampaign: true, utmContent: true,
+        },
+      });
+      const sessionMap = new Map(sessions.map(s => [s.id, s]));
+      const sessionIds = sessions.map(s => s.id);
+
+      // 3. Find Purchase/PurchaseConfirm events in those sessions
+      const events = await this.prisma.event.findMany({
+        where: {
+          sessionId: { in: sessionIds },
+          eventName: { in: ['Purchase', 'PurchaseConfirm'] },
+        },
+        select: {
+          id: true, eventName: true, sessionId: true, timestamp: true,
+          url: true, customData: true,
+        },
+        orderBy: { timestamp: 'desc' },
+      });
+
+      const purchases = events.map(e => {
+        const session = sessionMap.get(e.sessionId);
+        const ip = session ? visitorMap.get(session.visitorId) : null;
+        return {
+          id: e.id,
+          eventType: e.eventName,
+          timestamp: e.timestamp,
+          url: e.url,
+          metadata: e.customData,
+          ip,
+          utm_source: session?.utmSource,
+          utm_medium: session?.utmMedium,
+          utm_campaign: session?.utmCampaign,
+          utm_content: session?.utmContent,
+        };
+      });
+
+      return { purchases, total: purchases.length };
+    } catch (e) {
+      console.error('batchPurchasesByIps error:', e);
+      return { purchases: [], total: 0 };
+    }
+  }
 }
