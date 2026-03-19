@@ -301,21 +301,33 @@ export class AnalyticsService {
     }
   }
 
-  /** List PurchaseConfirm events with session/visitor details */
+  /** List PurchaseConfirm events with cross-session UTM attribution */
   async getPurchaseEvents(opts: { search?: string; page: number; limit: number; dateFrom?: string; dateTo?: string }) {
     try {
       const { search, page, limit, dateFrom, dateTo } = opts;
       const dateFilter = this.buildDateFilter(dateFrom, dateTo);
 
-      const where: any = { eventName: 'PurchaseConfirm', ...dateFilter };
+      let where: any = { eventName: 'PurchaseConfirm', ...dateFilter };
 
-      // Search across url, visitor IP
+      // For IP search, do a 2-step lookup (nested relation contains is too slow)
       if (search?.trim()) {
         const s = search.trim();
-        where.OR = [
-          { url: { contains: s, mode: 'insensitive' } },
-          { session: { visitor: { ip: { contains: s, mode: 'insensitive' } } } },
-        ];
+        // Check if it looks like an IP
+        const isIp = /^\d{1,3}\./.test(s);
+        if (isIp) {
+          // Step 1: Find visitors by IP
+          const visitors = await this.prisma.visitor.findMany({
+            where: { ip: { contains: s } },
+            select: { id: true },
+            take: 100,
+          });
+          const visitorIds = visitors.map(v => v.id);
+          if (visitorIds.length === 0) return { total: 0, page, limit, purchases: [] };
+          where = { ...where, session: { visitorId: { in: visitorIds } } };
+        } else {
+          // Search by URL (order UUID, etc.)
+          where.url = { contains: s, mode: 'insensitive' };
+        }
       }
 
       const [total, events] = await Promise.all([
@@ -329,6 +341,7 @@ export class AnalyticsService {
             customData: true,
             session: {
               select: {
+                visitorId: true,
                 utmSource: true,
                 utmCampaign: true,
                 utmMedium: true,
@@ -346,10 +359,49 @@ export class AnalyticsService {
         }),
       ]);
 
+      // Collect visitorIds where the purchase session has NO UTM (cross-session case)
+      const needUtmLookup = new Set<string>();
+      for (const e of events) {
+        if (!e.session?.utmSource && e.session?.visitorId) {
+          needUtmLookup.add(e.session.visitorId);
+        }
+      }
+
+      // Batch lookup: find the first UTM session for each visitor
+      const utmByVisitor = new Map<string, any>();
+      if (needUtmLookup.size > 0) {
+        const utmSessions = await this.prisma.session.findMany({
+          where: {
+            visitorId: { in: [...needUtmLookup] },
+            utmSource: { not: null },
+          },
+          select: {
+            visitorId: true,
+            utmSource: true,
+            utmCampaign: true,
+            utmMedium: true,
+            utmContent: true,
+            eventSlug: true,
+            landingUrl: true,
+          },
+          orderBy: { startedAt: 'asc' }, // First session with UTM
+        });
+        for (const s of utmSessions) {
+          if (!utmByVisitor.has(s.visitorId)) {
+            utmByVisitor.set(s.visitorId, s);
+          }
+        }
+      }
+
       const purchases = events.map(e => {
-        // Extract order UUID from URL (e.g. /order/UUID/confirm)
         const orderMatch = e.url?.match(/\/order\/([a-f0-9-]+)/i);
         const customData = (e.customData as any) || {};
+
+        // Use purchase session UTM if available, otherwise fallback to first UTM session
+        const sessionUtm = e.session?.utmSource ? e.session : null;
+        const utmFallback = e.session?.visitorId ? utmByVisitor.get(e.session.visitorId) : null;
+        const utm = sessionUtm || utmFallback;
+
         return {
           id: e.id,
           timestamp: e.timestamp,
@@ -359,12 +411,13 @@ export class AnalyticsService {
           currency: customData.currency || null,
           numItems: customData.num_items || null,
           ip: e.session?.visitor?.ip || null,
-          utm_source: e.session?.utmSource || null,
-          utm_campaign: e.session?.utmCampaign || null,
-          utm_medium: e.session?.utmMedium || null,
-          utm_content: e.session?.utmContent || null,
-          event_slug: e.session?.eventSlug || null,
+          utm_source: utm?.utmSource || null,
+          utm_campaign: utm?.utmCampaign || null,
+          utm_medium: utm?.utmMedium || null,
+          utm_content: utm?.utmContent || null,
+          event_slug: utm?.eventSlug || e.session?.eventSlug || null,
           environment: e.session?.environment || null,
+          crossSession: !sessionUtm && !!utmFallback, // flag if UTM came from a different session
         };
       });
 
