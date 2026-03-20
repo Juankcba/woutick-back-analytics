@@ -434,7 +434,7 @@ export class AnalyticsService {
       const envFilter = environment ? { environment } : {};
       const sessionDateFilter = this.buildDateFilter(dateFrom, dateTo, 'startedAt');
 
-      // Query 1: Sessions with UTM — select only needed fields
+      // Query 1: Sessions with UTM — select only needed fields, limited to avoid timeouts
       const sessions = await this.prisma.session.findMany({
         where: { utmSource: { not: null }, ...envFilter, ...sessionDateFilter },
         select: {
@@ -447,6 +447,8 @@ export class AnalyticsService {
           landingUrl: true,
           visitor: { select: { ip: true } },
         },
+        orderBy: { startedAt: 'desc' },
+        take: 500,
       });
 
       // Group sessions by utm combo (including utmContent)
@@ -496,6 +498,8 @@ export class AnalyticsService {
               timestamp: true,
               session: { select: { visitorId: true } },
             },
+            orderBy: { timestamp: 'desc' },
+            take: 200,
           })
         : [];
 
@@ -539,7 +543,7 @@ export class AnalyticsService {
     }
   }
 
-  /** Search visitor by IP — full journey */
+  /** Search visitor by IP — full journey (with limits to avoid timeouts) */
   async searchByIp(ip: string) {
     try {
       const visitor = await this.prisma.visitor.findFirst({
@@ -547,11 +551,11 @@ export class AnalyticsService {
         include: {
           sessions: {
             orderBy: { startedAt: 'desc' },
-            take: 20,
+            take: 10,
             include: {
-              events: { orderBy: { timestamp: 'asc' } },
-              requestLogs: { orderBy: { timestamp: 'asc' } },
-              metaLogs: { orderBy: { timestamp: 'asc' } },
+              events: { orderBy: { timestamp: 'asc' }, take: 50 },
+              requestLogs: { orderBy: { timestamp: 'asc' }, take: 20 },
+              metaLogs: { orderBy: { timestamp: 'asc' }, take: 20 },
             },
           },
         },

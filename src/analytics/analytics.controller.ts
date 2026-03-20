@@ -30,6 +30,7 @@ export class AnalyticsController {
       this.analyticsService.getDashboardStats(dateFrom, dateTo),
       this.analyticsService.getCampaignStats(environment, dateFrom, dateTo),
     ]);
+    // Note: date filters are now passed to getCampaignStats to avoid full collection scans
     return { dashboard, campaigns };
   }
 
